@@ -26,3 +26,12 @@ Esta documentación no declara una prueba como pasada si no se ejecutó en un en
 - [x] Variables de Google documentadas solo en backend `.env.example`.
 - [x] Migración 002 y soporte en `schema.sql` para identificadores Google.
 - [ ] Pendiente: configurar las credenciales OAuth reales en Google Cloud Console y probar el callback en el equipo local; esas credenciales no pueden generarse automáticamente.
+
+
+## Actualización — Fase 3 de seguridad (21-10-2026)
+
+- Añadido Helmet, CSP en las respuestas de la API, `Permissions-Policy`, y redirect HTTPS/HSTS condicionado a producción.
+- Añadida protección CSRF sincronizadora para POST/PUT/PATCH/DELETE, validación de Origin y Fetch Metadata; el cliente React adjunta `X-CSRF-Token`.
+- Añadidas plantillas de cabeceras para Netlify (`frontend/public/_headers`) y Vercel (`frontend/vercel.json`); se debe reemplazar `API_ORIGIN_REEMPLAZAR` antes del despliegue.
+- Verificación local en este entorno: `node --check` para fuentes JS seleccionadas y `node --test tests/security-phase3.test.js`: 5/5 pruebas de la protección CSRF pasaron.
+- Pendiente: instalación integral de dependencias (npm install excedió el tiempo límite en este entorno), compilación Vite, pruebas con PostgreSQL/navegador, comprobar cabeceras desde el hosting real y configurar TLS/proxy/dominio definitivo.

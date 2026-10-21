@@ -5,11 +5,14 @@ Este documento describe la configuración de seguridad para la versión de desar
 ## Implementado
 
 - Sesión del servidor con `express-session` y almacenamiento PostgreSQL mediante `connect-pg-simple`.
-- Cookie `rm.sid` con `HttpOnly`, `SameSite=Strict` y `Secure` cuando `NODE_ENV=production`.
+- Cookie `rm.sid` con `HttpOnly`, `SameSite=Lax` (para permitir el callback GET de Google OAuth) y `Secure` cuando `NODE_ENV=production`.
 - `SESSION_SECRET` obligatorio y de al menos 32 bytes; sesión expira en 30 minutos por defecto y se renueva con actividad.
 - Contraseñas guardadas como hashes bcrypt; el script seed no registra contraseñas.
 - Rate limiting para login y bloqueo temporal tras cinco intentos fallidos.
 - `CORS_ORIGIN` es una lista explícita; no permite `*` con sesiones.
+- Helmet en la API: CSP, `X-Content-Type-Options`, protección de clickjacking, `Referrer-Policy`; `Permissions-Policy` restringe sensores innecesarios.
+- En producción la API exige `PUBLIC_HTTPS_ORIGIN`, redirige HTTP a HTTPS y activa HSTS; requiere configurar correctamente `TRUST_PROXY` si hay proxy inverso.
+- CSRF con token sincronizador aleatorio guardado en sesión para POST/PUT/PATCH/DELETE, validación de Origin y Fetch Metadata; el cliente React obtiene el token y lo manda en `X-CSRF-Token`.
 - Middleware de sesión y permisos por rol en endpoints protegidos.
 - Validación Zod en IDs, query params y cuerpos con esquemas estrictos.
 - Consultas PostgreSQL parametrizadas; ordenamiento dinámico mediante listas permitidas.
@@ -36,11 +39,11 @@ Revisa `.env.example`, `backend/.env.example` y `frontend/.env.example`. En part
 
 ## Pendiente antes de producción
 
-- Fase 3: CSP/Helmet, HSTS, cabeceras finales, protección CSRF según el patrón de despliegue y HTTPS real en proxy/hosting. En producción se necesita `NODE_ENV=production`, certificado TLS válido y configuración coherente de `TRUST_PROXY`.
+- Fase 3: el backend tiene Helmet, CSRF y redirect HTTPS configurados. Sigue pendiente configurar certificados TLS, `PUBLIC_HTTPS_ORIGIN`, `TRUST_PROXY` y el origen de API en los encabezados del hosting real. `style-src 'unsafe-inline'` se mantiene por compatibilidad y debe evaluarse para endurecer CSP.
 - Fase 4: ejecutar `npm audit` en backend/frontend, fijar versiones confirmadas, automatizar escaneo con Dependabot y definir logs/alertas sin tokens ni datos personales.
 - Fase 5: pruebas de integración reales con PostgreSQL, OWASP ZAP, comprobación de cabeceras, prueba de bloqueo de login y revisión manual de permisos.
 - Crear usuario PostgreSQL dedicado con privilegios mínimos; no operar la API con el superusuario `postgres` en producción.
-- No exponer el puerto PostgreSQL en interfaces públicas; limitar firewall a los puertos necesarios.
+- No exponer el puerto PostgreSQL en interfaces públicas; limitar firewall a los puertos necesarios. En `compose.yaml`, el puerto 5432 está publicado para desarrollo local; elimínalo o enlázalo a `127.0.0.1` en producción.
 - Configurar copias de seguridad cifradas, retención y prueba de restauración.
 - Revisar minimización de datos, aviso de privacidad y consentimiento acorde a la Ley 8968 de Costa Rica antes de guardar información de clientes.
 - Valorar segundo factor para cuentas administrativas.
@@ -63,6 +66,16 @@ curl -i -b cookies.txt http://localhost:3001/api/productos
 
 No pegues contraseñas reales en tickets o bitácoras. Escanea el entorno de pruebas, no un sitio de terceros, con OWASP ZAP. SecurityHeaders.com y Mozilla Observatory solo pueden revisar un sitio públicamente accesible por HTTPS; los resultados dependen de la configuración real del hosting.
 
+
+## Fase 3 — Cabeceras, CORS, CSRF y HTTPS
+
+- API: Helmet está configurado en `backend/src/app.js` con CSP (`default-src`, `object-src 'none'`, `frame-ancestors 'none'` y fuentes restringidas), HSTS en producción, `Referrer-Policy`, `Permissions-Policy` y `X-Powered-By` desactivado.
+- Las mutaciones requieren el token CSRF sincronizador de sesión: `GET /api/auth/csrf` genera/devolverá `{ ok, csrfToken }`; la API exige `X-CSRF-Token` para POST/PUT/PATCH/DELETE. El frontend lo obtiene automáticamente desde `services/api.js`.
+- `CORS_ORIGIN` debe contener solo el origen exacto del frontend, separado por comas si hay más de uno; `*` no está permitido.
+- En producción define `NODE_ENV=production` y `PUBLIC_HTTPS_ORIGIN=https://tu-dominio-real.example`. La app redirige peticiones HTTP a ese origen configurado; usa certificado TLS válido en el hosting o proxy.
+- Si TLS termina en un proxy inverso, configura `TRUST_PROXY=true` únicamente si Express recibe exactamente un proxy confiable. No confíes en cabeceras forwarded desde clientes públicos.
+- Para Netlify: el archivo `frontend/public/_headers` es una plantilla activa; sustituye `https://API_ORIGIN_REEMPLAZAR` por el origen HTTPS exacto de tu API antes de publicar. Para Vercel, haz la misma sustitución en `frontend/vercel.json`.
+- La API no puede configurar HTTPS por un hosting externo: esa parte se debe completar en el proveedor o proxy del despliegue.
 
 ## Google OAuth / creación de cuentas
 

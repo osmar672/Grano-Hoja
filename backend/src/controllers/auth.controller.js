@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   getAccountByEmail,
   normalizeEmail,
@@ -20,6 +21,19 @@ function saveSession(req) {
   return new Promise((resolve, reject) => {
     req.session.save((error) => error ? reject(error) : resolve());
   });
+}
+
+
+export async function csrfToken(req, res, next) {
+  try {
+    if (!req.session.csrfToken) {
+      req.session.csrfToken = randomBytes(32).toString('base64url');
+      await saveSession(req);
+    }
+    return res.status(200).json({ ok: true, csrfToken: req.session.csrfToken });
+  } catch (error) {
+    return next(error);
+  }
 }
 
 export async function login(req, res, next) {

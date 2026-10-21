@@ -92,3 +92,14 @@ Esta bitácora registra el proceso del proyecto. Las entradas originales del pro
 **Qué corregí o rechacé:**
 
 - ________________________________________________________________
+
+
+## Registro — Fase 3 de seguridad
+
+**Prompt utilizado:** aplicar cabeceras HTTP de seguridad, CORS estricto, CSRF y redirección HTTPS de producción a Raíz & Madera, preservando el login local y Google OAuth.
+
+**Qué devolvió la IA:** se añadió Helmet con CSP y cabeceras, `Permissions-Policy`, HSTS y redirección HTTPS condicionados a producción, un token CSRF sincronizador almacenado en sesión, adquisición automática del token desde `frontend/src/services/api.js`, actualización de Postman y plantillas de cabeceras para hosting estático.
+
+**Qué corregí o rechacé:** pendiente de completar durante la validación en mi computadora.
+
+**Verificación ejecutada aquí:** `node --check` para los archivos JavaScript del backend y `node --test tests/security-phase3.test.js` (5 pruebas pasaron). No se pudo completar `npm install` en este entorno por timeout; falta ejecutar pruebas de integración con las dependencias instaladas y comprobar el despliegue real.

@@ -25,6 +25,7 @@ const googleOAuthLimiter = rateLimit({
   message: { error: 'Demasiados intentos de autenticación. Espera 15 minutos y vuelve a intentarlo' },
 });
 
+authRouter.get('/csrf', validateRequest({ query: emptyQuerySchema }), controller.csrfToken);
 authRouter.get('/google/start', googleOAuthLimiter, validateRequest({ query: googleStartQuerySchema }), googleController.startGoogleAuth);
 authRouter.get('/google/callback', googleOAuthLimiter, googleController.googleCallback);
 authRouter.post('/login', loginLimiter, validateRequest({ body: loginBodySchema, query: emptyQuerySchema }), controller.login);

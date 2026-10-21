@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "59c2a2ab-3d2f-4d7c-9a10-9b713b149e21",
     "name": "Raíz & Madera API - seguridad y ventas",
-    "description": "Pruebas para catálogo, inventario por unidades de producto, ventas, roles y agente. Ejecutar en orden. Configura contraseñas solo localmente en Postman.",
+    "description": "Pruebas para catálogo, inventario por unidades de producto, ventas, roles y agente. Ejecutar en orden. Configura contraseñas solo localmente en Postman.\nLa colección obtiene automáticamente un token CSRF antes de las solicitudes POST/PUT/PATCH/DELETE. Configura las contraseñas de las variables locales en Postman; no se guardan en el repositorio.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -11,7 +11,16 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "if (!pm.collectionVariables.get('runId')) pm.collectionVariables.set('runId', String(Date.now()));"
+          "if (!pm.collectionVariables.get('runId')) pm.collectionVariables.set('runId', String(Date.now()));",
+          "const method = pm.request.method.toUpperCase();",
+          "if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {",
+          "  const baseUrl = pm.collectionVariables.get('baseUrl');",
+          "  const csrfResponse = await pm.sendRequest({ url: `${baseUrl}/auth/csrf`, method: 'GET' });",
+          "  if (csrfResponse.code < 200 || csrfResponse.code >= 300) throw new Error('No se pudo obtener el token CSRF');",
+          "  const csrfToken = csrfResponse.json().csrfToken;",
+          "  if (!csrfToken) throw new Error('La API no devolvió csrfToken');",
+          "  pm.request.headers.upsert({ key: 'X-CSRF-Token', value: csrfToken });",
+          "}"
         ]
       }
     }

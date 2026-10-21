@@ -233,3 +233,12 @@ git commit -m "feat: transformar el sistema en Raíz & Madera"
 ```
 
 Si ya existe un remoto, usa `git remote -v` para verificarlo y después `git push`. No agregues `.env`, tokens, contraseñas ni credenciales exportadas.
+
+
+## Seguridad de peticiones y despliegue
+
+- React solicita `GET /api/auth/csrf` y adjunta `X-CSRF-Token` en mutaciones; este proceso está centralizado en `frontend/src/services/api.js`.
+- Si pruebas con curl, primero obtén el token manteniendo cookies de sesión y úsalo en la cabecera `X-CSRF-Token`. La colección Postman incluye un script de pre-request para hacerlo automáticamente.
+- Para producción, configura `NODE_ENV=production`, `PUBLIC_HTTPS_ORIGIN`, `CORS_ORIGIN` con el origen real de frontend, y un certificado TLS válido. Si hay proxy inverso, configura `TRUST_PROXY` solo de acuerdo con su topología.
+- Reemplaza `API_ORIGIN_REEMPLAZAR` en `frontend/public/_headers` o `frontend/vercel.json` antes de publicar en ese proveedor.
+- Consulta `SECURITY.md` y `docs/SECURITY_PHASE3.md` para las medidas de cabeceras, CSRF y HTTPS; no se certifica el despliegue hasta probar el dominio real.
