@@ -67,3 +67,7 @@ Haz esto por separado en `backend` y `frontend`, vuelve a ejecutar sus pruebas y
 - [ ] Configurar retención, acceso y alertas en el proveedor del despliegue.
 - [ ] Probar que eventos de login fallido, permisos denegados y mutaciones aparecen sin información secreta.
 - [ ] Confirmar el estado de mantenimiento de los paquetes mediante páginas oficiales/repositorios cuando el registro esté accesible.
+
+## Complemento: bitácora persistente del panel de administración
+
+El panel `/admin` registra en `admin_audit_events` altas/cambios de usuarios, operaciones de catálogo y eventos del flujo de ventas. La bitácora usa una lista permitida de metadatos y no contiene contraseñas, tokens ni correos. Aplica `backend/migrations/003_admin_tools.sql` en bases existentes.

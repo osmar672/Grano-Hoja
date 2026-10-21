@@ -1,5 +1,6 @@
 -- Raíz & Madera: inventario minorista de plantas, muebles y decoración.
 -- Solo para desarrollo: elimina y recrea los datos demo de esta base.
+DROP TABLE IF EXISTS admin_audit_events CASCADE;
 DROP TABLE IF EXISTS user_sessions CASCADE;
 DROP TABLE IF EXISTS pedido_items CASCADE;
 DROP TABLE IF EXISTS pedidos CASCADE;
@@ -22,6 +23,19 @@ CREATE TABLE app_users (
 );
 CREATE INDEX app_users_role_active_idx ON app_users(role, active);
 CREATE UNIQUE INDEX app_users_google_sub_uq ON app_users(google_sub) WHERE google_sub IS NOT NULL;
+
+
+CREATE TABLE admin_audit_events (
+  id BIGSERIAL PRIMARY KEY,
+  actor_user_id INTEGER REFERENCES app_users(id) ON DELETE SET NULL,
+  action VARCHAR(80) NOT NULL,
+  resource_type VARCHAR(40) NOT NULL,
+  resource_id VARCHAR(80),
+  details JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX admin_audit_events_created_idx ON admin_audit_events(created_at DESC, id DESC);
+CREATE INDEX admin_audit_events_actor_idx ON admin_audit_events(actor_user_id, created_at DESC);
 
 CREATE TABLE productos (
   id SERIAL PRIMARY KEY,

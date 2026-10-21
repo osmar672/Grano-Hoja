@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   agentBodySchema, idParamsSchema, loginBodySchema, orderCreateBodySchema,
   productCreateBodySchema, productListQuerySchema, productPatchBodySchema, summaryQuerySchema, googleStartQuerySchema,
+  adminUserCreateBodySchema, adminUserPatchBodySchema, adminUsersQuerySchema,
 } from '../src/validation/schemas.js';
 import { requireRole } from '../src/middleware/requireRole.js';
 
@@ -22,3 +23,28 @@ test('token de servicio solo funciona en middleware específico y se compara de 
 test('solicitud del agente limita longitud y rechaza marcado HTML',()=>{assert.equal(agentBodySchema.safeParse({solicitud:'Sugiere reposición a partir de ventas semanales'}).success,true);assert.equal(agentBodySchema.safeParse({solicitud:'<script>alert(1)</script>'}).success,false);assert.equal(agentBodySchema.safeParse({solicitud:'x'.repeat(1001)}).success,false);assert.equal(agentBodySchema.safeParse({solicitud:'analiza',role:'admin'}).success,false);});
 
 test('inicio y registro Google solo aceptan intenciones permitidas',()=>{assert.equal(googleStartQuerySchema.safeParse({intent:'login'}).success,true);assert.equal(googleStartQuerySchema.safeParse({intent:'register'}).success,true);assert.equal(googleStartQuerySchema.safeParse({intent:'admin'}).success,false);assert.equal(googleStartQuerySchema.safeParse({intent:'register',role:'admin'}).success,false);});
+
+
+test('administración exige contraseña fuerte y rol permitido al crear usuario', () => {
+  const valid = { email: 'PERSONA@example.com', displayName: 'Persona Nueva', password: 'RaizFuerte2026', role: 'caja' };
+  const parsed = adminUserCreateBodySchema.safeParse(valid);
+  assert.equal(parsed.success, true);
+  assert.equal(parsed.data.email, 'persona@example.com');
+  assert.equal(adminUserCreateBodySchema.safeParse({ ...valid, role: 'superadmin' }).success, false);
+  assert.equal(adminUserCreateBodySchema.safeParse({ ...valid, password: 'weak' }).success, false);
+  assert.equal(adminUserCreateBodySchema.safeParse({ ...valid, extra: 'admin' }).success, false);
+});
+
+test('PATCH de usuario exige al menos un campo y limita roles', () => {
+  assert.equal(adminUserPatchBodySchema.safeParse({ active: false }).success, true);
+  assert.equal(adminUserPatchBodySchema.safeParse({ role: 'encargado' }).success, true);
+  assert.equal(adminUserPatchBodySchema.safeParse({}).success, false);
+  assert.equal(adminUserPatchBodySchema.safeParse({ role: 'root' }).success, false);
+  assert.equal(adminUserPatchBodySchema.safeParse({ active: true, admin: true }).success, false);
+});
+
+test('filtros del panel de administración limitan la consulta y la cantidad de eventos', () => {
+  assert.equal(adminUsersQuerySchema.safeParse({ q: 'Raíz', role: 'admin', status: 'active', limit: '50' }).success, true);
+  assert.equal(adminUsersQuerySchema.safeParse({ limit: '1000' }).success, false);
+  assert.equal(adminUsersQuerySchema.safeParse({ sort: 'DROP TABLE' }).success, false);
+});

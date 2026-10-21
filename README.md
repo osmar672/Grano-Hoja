@@ -7,7 +7,7 @@ Sistema de gestión para una tienda de **plantas, muebles y decoración**. Inclu
 ## Funciones
 
 - Inicio de sesión mediante sesión almacenada en PostgreSQL; contraseñas con bcrypt y límite de intentos.
-- Roles `admin`, `encargado` y `caja`, autorizados en el backend.
+- Roles `admin`, `encargado` y `caja`, autorizados en el backend. El panel `/admin` (solo administración) permite gestionar cuentas, roles, estado, restablecer contraseñas y revisar la actividad registrada.
 - Catálogo de plantas, muebles y decoración con búsqueda, filtros y ordenamiento.
 - CRUD de productos, incluyendo precio, descripción, categoría, existencias, mínimo de reposición y estado activo.
 - Ventas con precio histórico por línea, impuesto de demostración del 13 %, método de pago y estado.
@@ -24,6 +24,7 @@ Raiz-y-Madera/
 ├── schema.sql
 ├── compose.yaml
 ├── backend/
+│   ├── migrations/          # Migraciones incrementales para bases existentes
 │   ├── src/routes/          # Endpoints REST
 │   ├── src/controllers/     # Entrada/salida HTTP
 │   ├── src/services/        # SQL y reglas de negocio
@@ -107,6 +108,18 @@ npm run dev
 
 La API queda en `http://localhost:3001`. Prueba `http://localhost:3001/api/health`; debe devolver `200` y `{"ok":true,"message":"API Raíz & Madera activa"}`. Los endpoints comerciales devuelven `401` si no hay sesión activa.
 
+### Panel de administración
+
+El rol `admin` ve la opción **Admin** en la navegación y puede abrir `/admin`. La página permite consultar métricas administrativas, crear cuentas locales, buscar/filtrar usuarios, cambiar roles, activar/desactivar cuentas, restablecer contraseñas y consultar auditoría reciente. El backend vuelve a comprobar el rol en todas las rutas `/api/admin`; ocultar el enlace en React no es una medida de seguridad. No se permite cambiar el propio rol/estado ni desactivar o degradar al último administrador activo.
+
+En bases existentes, ejecuta la migración una sola vez desde la raíz (ajusta usuario/base si corresponde):
+
+```powershell
+Get-Content backend/migrations/003_admin_tools.sql | docker compose exec -T db psql -U postgres -d raiz_madera
+```
+
+En una base nueva, `schema.sql` ya crea `admin_audit_events`. Las rutas administrativas son `GET /api/admin/overview`, `GET /api/admin/users`, `POST /api/admin/users`, `PATCH /api/admin/users/:id` y `GET /api/admin/audit`. Las contraseñas se validan en el servidor y se almacenan con bcrypt; la bitácora no guarda credenciales ni correos.
+
 ### Registro y acceso con Google
 
 La pantalla `/login` ofrece **Continuar con Google** y **Crear usuario con Google**. La integración usa el flujo OAuth 2.0 Authorization Code del servidor con la biblioteca oficial `google-auth-library`, `state`, `nonce`, PKCE S256 y verificación del ID token. Solo se solicitan los scopes OpenID `openid`, `email` y `profile`; la aplicación no lee el buzón ni pide la contraseña de Google. Google exige que el URI de redirección coincida exactamente con el configurado en Cloud Console.
@@ -170,6 +183,11 @@ El impuesto del 13 % se conserva como regla del ejercicio. Si la tienda operara 
 | GET | `/api/auth/google/start?intent=register` | Crear usuario nuevo verificando Google (rol inicial caja) |
 | GET | `/api/auth/google/callback` | Callback OAuth validado por el servidor |
 | GET | `/api/auth/me` | Usuario de la sesión actual |
+| GET | `/api/admin/overview` | Métricas operativas para el rol `admin` |
+| GET | `/api/admin/users` | Buscar/filtrar usuarios (solo `admin`) |
+| POST | `/api/admin/users` | Crear cuenta local con rol inicial controlado (solo `admin`) |
+| PATCH | `/api/admin/users/:id` | Cambiar rol/estado o restablecer contraseña (solo `admin`) |
+| GET | `/api/admin/audit` | Actividad reciente del catálogo, ventas y usuarios (solo `admin`) |
 | POST | `/api/auth/logout` | Destruir sesión |
 | GET | `/api/productos` | Catálogo con `q`, `categoria`, `orden`, `direccion`, `activo`, `bajo_stock` |
 | POST | `/api/productos` | Crear producto (`admin`, `encargado`) |

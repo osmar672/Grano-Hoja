@@ -70,6 +70,16 @@
       "key": "noStockSaleId",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "adminCreatedUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminUserId",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -142,6 +152,25 @@
             "exec": [
               "pm.test('Sesión válida de caja', () => pm.response.to.have.status(200));",
               "pm.expect(pm.response.json().user.role).to.eql('caja');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "403 - caja no puede entrar a administración",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/users"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Caja no puede acceder al panel admin', () => pm.response.to.have.status(403));"
             ]
           }
         }
@@ -228,7 +257,169 @@
             "type": "text/javascript",
             "exec": [
               "pm.test('Usuario autenticado', () => pm.response.to.have.status(200));",
-              "pm.expect(pm.response.json().user.role).to.eql('admin');"
+              "pm.expect(pm.response.json().user.role).to.eql('admin');",
+              "pm.collectionVariables.set('adminUserId', pm.response.json().user.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "409 - admin no puede cambiarse su rol",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/admin/users/{{adminUserId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"role\": \"encargado\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Un admin no puede cambiar su propio rol', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Métricas administrativas",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/overview"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Métricas administrativas responden', () => pm.response.to.have.status(200));",
+              "pm.expect(pm.response.json().data.active_users).to.be.a('number');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Listar usuarios administración",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/users?limit=50"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Lista de usuarios protegida por admin', () => pm.response.to.have.status(200));",
+              "pm.expect(pm.response.json().data).to.be.an('array');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Crear usuario de prueba admin",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/admin/users",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"postman-{{runId}}@example.local\",\n  \"displayName\": \"Usuario de prueba Postman\",\n  \"password\": \"RaizPrueba2026\",\n  \"role\": \"caja\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Usuario de prueba creado', () => pm.response.to.have.status(201));",
+              "const d = pm.response.json().data; pm.expect(d.id).to.exist; pm.collectionVariables.set('adminCreatedUserId', d.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Desactivar usuario de prueba admin",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/admin/users/{{adminCreatedUserId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"active\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Usuario de prueba desactivado', () => pm.response.to.have.status(200));",
+              "pm.expect(pm.response.json().data.active).to.eql(false);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Actividad de auditoría admin",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/audit?limit=30"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Auditoría administrativa devuelve lista', () => pm.response.to.have.status(200));",
+              "pm.expect(pm.response.json().data).to.be.an('array');"
             ]
           }
         }

@@ -5,6 +5,7 @@ export const ROLE = Object.freeze({
 });
 
 const permissions = Object.freeze({
+  adminPanel: [ROLE.ADMIN],
   manageCatalog: [ROLE.ADMIN, ROLE.MANAGER],
   deleteCatalog: [ROLE.ADMIN],
   purchaseAssistant: [ROLE.ADMIN, ROLE.MANAGER],

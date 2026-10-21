@@ -10,6 +10,7 @@ import { pedidosRouter } from './routes/pedidos.routes.js';
 import { resumenRouter } from './routes/resumen.routes.js';
 import { reportesRouter } from './routes/reportes.routes.js';
 import { agenteRouter } from './routes/agente.routes.js';
+import { adminRouter } from './routes/admin.routes.js';
 import { csrfProtection } from './middleware/csrfProtection.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
@@ -136,6 +137,7 @@ app.use(csrfProtection);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, message: 'API Raíz & Madera activa' }));
 app.use('/api/auth', authRouter);
+app.use('/api/admin', adminRouter);
 
 // Cada router aplica autenticación, permisos por rol y validación según el método y recurso.
 app.use('/api/productos', productosRouter);

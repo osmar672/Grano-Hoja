@@ -116,3 +116,14 @@ Esta bitácora registra el proceso del proyecto. Las entradas originales del pro
 **Qué corregí o rechacé:**
 
 ____________________________________________________
+
+
+## Panel de administración
+
+**Prompt:** Añadir un panel exclusivo para `admin` con métricas, gestión de usuarios y roles, bloqueo seguro del último administrador y auditoría de acciones, respetando el CSRF y los esquemas de validación existentes.
+
+**Qué devolvió la IA:** endpoints `/api/admin`, servicio transaccional de usuarios, tabla `admin_audit_events`, vista React `/admin`, formularios controlados y accesos rápidos.
+
+**Qué corregí o rechacé:**
+
+____________________________________________________________

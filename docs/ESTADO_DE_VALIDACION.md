@@ -35,3 +35,14 @@ Esta documentación no declara una prueba como pasada si no se ejecutó en un en
 - Añadidas plantillas de cabeceras para Netlify (`frontend/public/_headers`) y Vercel (`frontend/vercel.json`); se debe reemplazar `API_ORIGIN_REEMPLAZAR` antes del despliegue.
 - Verificación local en este entorno: `node --check` para fuentes JS seleccionadas y `node --test tests/security-phase3.test.js`: 5/5 pruebas de la protección CSRF pasaron.
 - Pendiente: instalación integral de dependencias (npm install excedió el tiempo límite en este entorno), compilación Vite, pruebas con PostgreSQL/navegador, comprobar cabeceras desde el hosting real y configurar TLS/proxy/dominio definitivo.
+
+
+## Actualización — Panel de administración
+
+- Añadida la página React `/admin`, visible solo para el rol `admin`, con resumen, accesos rápidos, gestión de usuarios, filtros, cambio de rol/estado, restablecimiento de contraseñas y actividad reciente.
+- Añadidos `GET /api/admin/overview`, `GET /api/admin/users`, `POST /api/admin/users`, `PATCH /api/admin/users/:id` y `GET /api/admin/audit`; todos detrás de `requireAuth` y `requireRole('admin')`.
+- Añadido `backend/migrations/003_admin_tools.sql` para bases existentes y la tabla `admin_audit_events` a `schema.sql` para instalaciones nuevas. Las acciones de administración se escriben en auditoría dentro de la misma transacción de las operaciones de usuario; catálogo y ventas añaden eventos best-effort sin interrumpir una operación ya confirmada.
+- Se protege la última cuenta admin activa, se bloquea el cambio de rol/estado de la propia cuenta y se evita exponer secretos en los metadatos de auditoría.
+- Verificación ejecutada aquí: `npm run check` validó sintaxis de 43 archivos del backend; `node --test tests/admin-rules.test.js` pasó 3/3; el parser de TypeScript transpuso 30 archivos JS/JSX del frontend sin errores sintácticos; JSON de Postman validado.
+- Pendiente: instalar dependencias para ejecutar la suite completa y el build real de Vite; aplicar la migración en PostgreSQL y probar la página/operaciones con una sesión admin real. En este entorno el test conjunto no pudo importar `zod` porque las dependencias npm no están instaladas.
+- La ejecución de `npm test` completa en el entorno de generación se detuvo en `tests/validation.test.js` porque no está instalado el paquete `zod`; los 12 tests ejecutados sin esa dependencia pasaron. Ejecuta `npm install` en backend antes de repetir la suite completa.

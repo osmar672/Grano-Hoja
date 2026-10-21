@@ -47,3 +47,30 @@ export const optionalEmptyBodySchema = z.object({}).strict().optional();
 export const agentBodySchema = z.object({ solicitud: safeText(1000, 'La solicitud del asistente') }).strict();
 
 export const googleStartQuerySchema = z.object({ intent: z.enum(['login', 'register']) }).strict();
+
+
+const adminRole = z.enum(['admin', 'encargado', 'caja']);
+const adminPassword = z.string().min(12, 'La contraseña debe tener al menos 12 caracteres')
+  .max(72, 'La contraseña supera el máximo admitido por bcrypt')
+  .refine((value) => Buffer.byteLength(value, 'utf8') <= 72, 'La contraseña supera el máximo admitido por bcrypt')
+  .refine((value) => /[a-z]/.test(value) && /[A-Z]/.test(value) && /\d/.test(value), 'Usa mayúsculas, minúsculas y números');
+export const adminUsersQuerySchema = z.object({
+  q: searchText(100).optional(),
+  role: adminRole.optional(),
+  status: z.enum(['active', 'inactive']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+}).strict();
+export const adminAuditQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+}).strict();
+export const adminUserCreateBodySchema = z.object({
+  email: z.string().trim().email('Debe ser un correo válido').max(254).transform((value) => value.toLowerCase()),
+  displayName: safeText(120, 'El nombre'),
+  password: adminPassword,
+  role: adminRole,
+}).strict();
+export const adminUserPatchBodySchema = z.object({
+  role: adminRole.optional(),
+  active: z.boolean().optional(),
+  password: adminPassword.optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, 'Debes enviar al menos un cambio');

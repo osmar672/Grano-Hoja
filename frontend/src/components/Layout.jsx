@@ -11,6 +11,7 @@ const navigation = [
   { to: '/inventario', label: 'Inventario', caption: 'Existencias', icon: '❋' },
   { to: '/pedidos', label: 'Ventas', caption: 'Historial', icon: '↗' },
   { to: '/asistente-compras', label: 'Asistente IA', caption: 'Reposición', icon: '✦' },
+  { to: '/admin', label: 'Admin', caption: 'Usuarios y control', icon: '⚙', adminOnly: true },
 ];
 
 export default function Layout() {
@@ -23,7 +24,11 @@ export default function Layout() {
     finally { setLoggingOut(false); }
   }
   const initials = (user?.displayName || user?.email || 'RM').split(/[\s@._-]+/).filter(Boolean).slice(0,2).map((part) => part[0].toUpperCase()).join('');
-  const visibleNavigation = navigation.filter((item) => item.to !== '/asistente-compras' || can(user, 'purchaseAssistant'));
+  const visibleNavigation = navigation.filter((item) => {
+    if (item.adminOnly && !can(user, 'adminPanel')) return false;
+    if (item.to === '/asistente-compras' && !can(user, 'purchaseAssistant')) return false;
+    return true;
+  });
   return <div className="app-shell">
     <aside className="sidebar">
       <Link className="brand" to="/" aria-label="Raíz & Madera, ir al panel"><span className="brand-mark"><LogoMark /></span><span className="brand-copy"><strong>Raíz <i>&</i> Madera</strong><small>PLANTAS · MUEBLES · HOGAR</small></span></Link>
@@ -35,7 +40,7 @@ export default function Layout() {
     </aside>
     <div className="workspace">
       <header className="workspace-topbar"><div className="workspace-context"><span className="context-mark">RM</span><div><span className="context-kicker">UN HOGAR EN EQUILIBRIO</span><strong>Espacio de gestión</strong></div></div>
-        <div className="topbar-tools"><span className="topbar-motto"><span aria-hidden="true">✧</span> Vive más natural</span><div className="topbar-user" title={`${user?.displayName || user?.email} · ${roleNames[user?.role] || user?.role}`}><span className="topbar-avatar">{initials}</span><span className="topbar-user-copy"><strong>{user?.displayName || user?.email}</strong><small>{roleNames[user?.role] || 'Equipo'}</small></span></div><button className="logout-button" type="button" onClick={handleLogout} disabled={loggingOut} aria-label="Cerrar sesión">{loggingOut ? 'Saliendo…' : 'Salir'} <span aria-hidden="true">↗</span></button><Link className="button button-primary topbar-action" to="/pedidos/nuevo"><span aria-hidden="true">＋</span> Nueva venta</Link></div>
+        <div className="topbar-tools">{can(user, 'adminPanel') && <Link className="topbar-admin-link" to="/admin" aria-label="Abrir administración">⚙ Admin</Link>}<span className="topbar-motto"><span aria-hidden="true">✧</span> Vive más natural</span><div className="topbar-user" title={`${user?.displayName || user?.email} · ${roleNames[user?.role] || user?.role}`}><span className="topbar-avatar">{initials}</span><span className="topbar-user-copy"><strong>{user?.displayName || user?.email}</strong><small>{roleNames[user?.role] || 'Equipo'}</small></span></div><button className="logout-button" type="button" onClick={handleLogout} disabled={loggingOut} aria-label="Cerrar sesión">{loggingOut ? 'Saliendo…' : 'Salir'} <span aria-hidden="true">↗</span></button><Link className="button button-primary topbar-action" to="/pedidos/nuevo"><span aria-hidden="true">＋</span> Nueva venta</Link></div>
       </header>
       {logoutError && <div className="logout-error" role="alert">{logoutError}</div>}
       <main className="main-content"><Outlet /></main>
