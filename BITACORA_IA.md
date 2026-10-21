@@ -43,3 +43,10 @@
 **Qué devolvió la IA:** README de raíz, colección Postman, guía de pruebas y defensa, y checklist relacionado con las ponderaciones de evaluación.
 
 **Qué corregí o rechacé:** _Completar después de usar la colección y contrastar cada criterio con evidencia real._
+
+## Prompt 7 — Rediseño visual con animaciones
+**Prompt usado:** Rediseña la interfaz existente de Grano & Hoja tomando como referencia visual la presentación forestal adjunta: verdes profundos, tonos crema, contraste editorial y motivos botánicos. Añade animaciones modernas, transiciones cuidadas y adaptación móvil, sin modificar las reglas de negocio ni agregar librerías de interfaz.
+
+**Qué devolvió la IA:** nueva navegación lateral adaptable, barra superior translúcida, cabeceras verde bosque con ilustración SVG, tarjetas con profundidad, estados hover y animaciones de entrada, junto con soporte para `prefers-reduced-motion`.
+
+**Qué corregí o rechacé:** _Completar después de abrir la interfaz en navegador en escritorio y móvil; ajustar lo que no sea cómodo para caja._

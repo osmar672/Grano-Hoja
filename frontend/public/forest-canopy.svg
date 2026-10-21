@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 460" fill="none">
+  <defs>
+    <linearGradient id="canopy" x1="90" y1="110" x2="680" y2="390" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9DBE83" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#426E4B" stop-opacity=".35"/>
+    </linearGradient>
+    <linearGradient id="trunk" x1="470" y1="100" x2="470" y2="450" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9DBA79" stop-opacity=".7"/><stop offset="1" stop-color="#406C48" stop-opacity=".3"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="matrix(0 226 -285 0 513 189)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C7DCA2" stop-opacity=".22"/><stop offset="1" stop-color="#C7DCA2" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="513" cy="189" rx="285" ry="226" fill="url(#glow)"/>
+  <g opacity=".52" fill="#274E35">
+    <path d="M536 453 645 76l106 377H536Z"/><path d="M601 453 720 171l40 94v188H601Z"/>
+    <path d="M385 453 473 115l103 338H385Z"/><path d="M302 453 373 221l83 232H302Z"/>
+  </g>
+  <g opacity=".66" fill="url(#canopy)">
+    <path d="M475 453 572 128l111 325H475Z"/>
+    <path d="M550 453 655 190l103 263H550Z"/>
+    <path d="M346 453 421 207l92 246H346Z"/>
+  </g>
+  <g stroke="url(#trunk)" stroke-linecap="round" stroke-width="9" opacity=".7">
+    <path d="M572 450V256M655 450V304M421 450V319M720 450V338"/>
+  </g>
+  <g fill="#A7C78B" opacity=".46">
+    <ellipse cx="560" cy="180" rx="31" ry="13" transform="rotate(-36 560 180)"/>
+    <ellipse cx="602" cy="221" rx="33" ry="14" transform="rotate(24 602 221)"/>
+    <ellipse cx="514" cy="242" rx="29" ry="13" transform="rotate(-25 514 242)"/>
+    <ellipse cx="682" cy="251" rx="34" ry="14" transform="rotate(-32 682 251)"/>
+    <ellipse cx="626" cy="300" rx="37" ry="15" transform="rotate(33 626 300)"/>
+    <ellipse cx="473" cy="304" rx="33" ry="14" transform="rotate(28 473 304)"/>
+    <ellipse cx="701" cy="348" rx="38" ry="16" transform="rotate(-23 701 348)"/>
+  </g>
+  <g fill="#DCE8C2" opacity=".35">
+    <circle cx="536" cy="124" r="3"/><circle cx="615" cy="153" r="2.5"/><circle cx="659" cy="213" r="2.5"/><circle cx="492" cy="198" r="2"/><circle cx="705" cy="280" r="3"/><circle cx="588" cy="346" r="2.5"/>
+  </g>
+  <path d="M270 454c88-30 150-26 227 0H270Z" fill="#315D3E" opacity=".48"/>
+</svg>

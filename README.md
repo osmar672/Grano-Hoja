@@ -211,3 +211,6 @@ git commit -m "feat: implementar Grano & Hoja con API y frontend"
 ```
 
 Si ya creaste el repositorio remoto, añade el remoto y realiza `git push -u origin main`. Nunca subas `.env` ni credenciales.
+
+## Rediseño visual
+La interfaz usa una dirección botánica inspirada en la presentación forestal: navegación en verde bosque, superficies crema, cabeceras ilustradas, tarjetas de métricas con profundidad y animaciones de entrada/hover. Es responsive y respeta `prefers-reduced-motion`. El diseño está descrito en [`docs/REDISENO_VISUAL.md`](docs/REDISENO_VISUAL.md).
