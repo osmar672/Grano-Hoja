@@ -7,9 +7,13 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "check": "node --check src/server.js && node --check src/app.js && node --check src/controllers/google-auth.controller.js && node --check src/routes/auth.routes.js && node --check src/services/auth.service.js",
+    "check": "node scripts/check-syntax.js",
     "users:seed": "node scripts/seed-users.js",
-    "test": "node --test"
+    "test": "node --test",
+    "audit": "npm audit --audit-level=moderate",
+    "audit:high": "npm audit --audit-level=high",
+    "audit:fix": "npm audit fix",
+    "outdated": "npm outdated"
   },
   "dependencies": {
     "cors": "^2.8.5",

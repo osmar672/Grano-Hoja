@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { logError } from './utils/logger.js';
 
 const { Pool } = pg;
 export const pool = new Pool({
@@ -8,5 +9,6 @@ export const pool = new Pool({
 });
 
 pool.on('error', (error) => {
-  console.error('Error inesperado en el pool PostgreSQL:', error.message);
+  // No se registra el mensaje completo del driver porque puede contener metadatos internos.
+  logError('database.pool_error', { errorName: error.name || 'DatabaseError', errorCode: error.code });
 });

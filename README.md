@@ -242,3 +242,12 @@ Si ya existe un remoto, usa `git remote -v` para verificarlo y después `git pus
 - Para producción, configura `NODE_ENV=production`, `PUBLIC_HTTPS_ORIGIN`, `CORS_ORIGIN` con el origen real de frontend, y un certificado TLS válido. Si hay proxy inverso, configura `TRUST_PROXY` solo de acuerdo con su topología.
 - Reemplaza `API_ORIGIN_REEMPLAZAR` en `frontend/public/_headers` o `frontend/vercel.json` antes de publicar en ese proveedor.
 - Consulta `SECURITY.md` y `docs/SECURITY_PHASE3.md` para las medidas de cabeceras, CSRF y HTTPS; no se certifica el despliegue hasta probar el dominio real.
+
+
+## Fase 4 — Auditoría de dependencias y logs
+
+- Ejecuta `npm install`, `npm run audit`, `npm run outdated`, `npm run check` y `npm test` en backend; después ejecuta `npm install`, `npm run audit`, `npm run outdated` y `npm run build` en frontend.
+- Guarda los dos lockfiles creados en Git para instalaciones reproducibles. Tras guardarlos, se puede cambiar el CI a `npm ci`.
+- `.github/dependabot.yml` comprueba actualizaciones semanalmente y `.github/workflows/security.yml` hace auditoría y pruebas de forma programada y ante cambios.
+- Los eventos de aplicación se registran como JSON sin contraseñas, tokens, emails ni cuerpos. Cada respuesta incluye `X-Request-Id` para correlación.
+- No se obtuvo salida de auditoría npm en el entorno de generación porque npm registry agotó el tiempo de espera; consulta `docs/SECURITY_PHASE4.md` y no interpretes esto como un resultado limpio.

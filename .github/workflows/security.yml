@@ -1,0 +1,63 @@
+name: Dependency audit and checks
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '23 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-audit:
+    name: Backend dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        working-directory: backend
+        run: npm install --no-fund --no-audit
+      - name: Audit moderate and high vulnerabilities
+        working-directory: backend
+        run: npm audit --audit-level=moderate
+
+  backend-tests:
+    name: Backend syntax and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        working-directory: backend
+        run: npm install --no-fund --no-audit
+      - name: Check JavaScript syntax
+        working-directory: backend
+        run: npm run check
+      - name: Run unit tests
+        working-directory: backend
+        run: npm test
+
+  frontend-audit-build:
+    name: Frontend audit and production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install --no-fund --no-audit
+      - name: Audit moderate and high vulnerabilities
+        working-directory: frontend
+        run: npm audit --audit-level=moderate
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build

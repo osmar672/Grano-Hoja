@@ -40,7 +40,7 @@ Revisa `.env.example`, `backend/.env.example` y `frontend/.env.example`. En part
 ## Pendiente antes de producción
 
 - Fase 3: el backend tiene Helmet, CSRF y redirect HTTPS configurados. Sigue pendiente configurar certificados TLS, `PUBLIC_HTTPS_ORIGIN`, `TRUST_PROXY` y el origen de API en los encabezados del hosting real. `style-src 'unsafe-inline'` se mantiene por compatibilidad y debe evaluarse para endurecer CSP.
-- Fase 4: ejecutar `npm audit` en backend/frontend, fijar versiones confirmadas, automatizar escaneo con Dependabot y definir logs/alertas sin tokens ni datos personales.
+- Fase 4: logger JSON con lista permitida, correlación por `X-Request-Id`, eventos de autenticación y cambios sensibles, pruebas que comprueban omisión de secretos, Dependabot y workflow CI de auditoría. **Pendiente de ejecución local:** `npm audit` real y lockfiles; el registro npm no respondió en el entorno de generación, por lo que no se afirma ausencia de vulnerabilidades. Configurar retención y alertas en el hosting.
 - Fase 5: pruebas de integración reales con PostgreSQL, OWASP ZAP, comprobación de cabeceras, prueba de bloqueo de login y revisión manual de permisos.
 - Crear usuario PostgreSQL dedicado con privilegios mínimos; no operar la API con el superusuario `postgres` en producción.
 - No exponer el puerto PostgreSQL en interfaces públicas; limitar firewall a los puertos necesarios. En `compose.yaml`, el puerto 5432 está publicado para desarrollo local; elimínalo o enlázalo a `127.0.0.1` en producción.
@@ -52,9 +52,17 @@ Revisa `.env.example`, `backend/.env.example` y `frontend/.env.example`. En part
 
 ```powershell
 cd backend
-npm audit
+npm install
+npm run audit
+npm run outdated
 npm test
 npm run check
+# Luego revisar también frontend:
+cd ../frontend
+npm install
+npm run audit
+npm run outdated
+npm run build
 ```
 
 Login de prueba con `curl` puede requerir guardar la cookie, por ejemplo:
@@ -86,3 +94,25 @@ No pegues contraseñas reales en tickets o bitácoras. Escanea el entorno de pru
 - Variables requeridas: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `FRONTEND_URL`. El secreto es exclusivo del backend.
 - La cookie de sesión usa `SameSite=Lax` para permitir el callback OAuth de navegación superior y mantiene `HttpOnly`; en producción exige HTTPS para `Secure`. Completar la Fase 3 para las defensas CSRF y el despliegue HTTPS integral.
 - En Google Cloud Console registra el URI callback exacto; localhost HTTP solo se utiliza para desarrollo.
+
+
+## Fase 4 — Dependencias, logs y monitoreo
+
+Consulta `docs/SECURITY_PHASE4.md` para instrucciones reproducibles. La auditoría npm no se pudo completar en el entorno que generó este ZIP; ejecuta `npm install`/`npm run audit` por separado en backend y frontend, revisa los resultados, guarda los `package-lock.json` y no uses `npm audit fix --force` sin revisar los cambios. El CI de `.github/workflows/security.yml` ejecuta análisis en push/PR y semanalmente.
+
+
+## Estado Fase 4 — Dependencias, logs y monitoreo
+
+| Medida | Estado | Evidencia / pendiente |
+|---|---|---|
+| Logs JSON con lista permitida y sin secretos | Implementada en código | `backend/src/utils/logger.js` |
+| ID de correlación por solicitud | Implementada en código | Header `X-Request-Id` |
+| Eventos de login, denegación de permisos y cambios sensibles | Implementada en código | Eventos `auth.*`, `authz.*`, `audit.*` |
+| Prueba de que el logger no imprime credenciales/PII | Implementada en tests unitarios | `backend/tests/logger.test.js` |
+| Dependabot semanal | Configurado | `.github/dependabot.yml`; se activa al subirlo al repositorio |
+| CI con auditoría y tests | Configurado | `.github/workflows/security.yml` |
+| `npm audit` real para este ZIP | Pendiente | El registro npm agotó el tiempo de espera al generar la entrega |
+| Lockfiles versionados | Pendiente | Ejecuta `npm install` por carpeta y revisa/añade ambos `package-lock.json` |
+| Alertas y retención en producción | Pendiente | Configúralas en el hosting/gestor de logs |
+
+En GitHub, después de hacer `git push`, revisa Settings → Advanced Security y activa **Dependabot alerts** y **Dependabot security updates** si están disponibles en el repositorio. La revisión semanal crea pull requests; no acepta automáticamente cambios de versión por ti.

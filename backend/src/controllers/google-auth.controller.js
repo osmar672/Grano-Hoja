@@ -1,5 +1,6 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { OAuth2Client } from 'google-auth-library';
+import { logInfo, logWarn } from '../utils/logger.js';
 import {
   createGoogleAccount,
   getAccountByEmail,
@@ -32,7 +33,8 @@ function sameSecret(left, right) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-function loginRedirect(res, error) {
+function loginRedirect(res, error, req) {
+  if (error) logWarn('auth.google_flow_ended', { requestId: req?.requestId, action: 'google_auth', outcome: 'redirected', reason: error });
   const target = new URL('/login', FRONTEND_URL);
   if (error) target.searchParams.set('oauthError', error);
   return res.redirect(303, target.toString());
@@ -52,9 +54,9 @@ function saveSession(req) {
 
 export async function startGoogleAuth(req, res, next) {
   try {
-    if (!hasGoogleConfig()) return loginRedirect(res, 'google_not_configured');
+    if (!hasGoogleConfig()) return loginRedirect(res, 'google_not_configured', req);
     const intent = req.query.intent;
-    if (intent !== 'login' && intent !== 'register') return loginRedirect(res, 'invalid_intent');
+    if (intent !== 'login' && intent !== 'register') return loginRedirect(res, 'invalid_intent', req);
 
     const client = makeOAuthClient();
     const { codeVerifier, codeChallenge } = await client.generateCodeVerifierAsync();
@@ -84,25 +86,25 @@ export async function googleCallback(req, res) {
   // El state se guarda en la sesión; SameSite=Lax permite el callback GET de Google.
   if (!flow || Date.now() - flow.createdAt > STATE_TTL_MS || !sameSecret(req.query.state, flow.state)) {
     if (req.session) delete req.session.googleOAuth;
-    return loginRedirect(res, 'oauth_state_invalid');
+    return loginRedirect(res, 'oauth_state_invalid', req);
   }
   delete req.session.googleOAuth;
 
   if (req.query.error || typeof req.query.code !== 'string') {
-    return loginRedirect(res, 'google_cancelled');
+    return loginRedirect(res, 'google_cancelled', req);
   }
 
   try {
-    if (!hasGoogleConfig()) return loginRedirect(res, 'google_not_configured');
+    if (!hasGoogleConfig()) return loginRedirect(res, 'google_not_configured', req);
     const client = makeOAuthClient();
     const { tokens } = await client.getToken({ code: req.query.code, codeVerifier: flow.codeVerifier });
-    if (!tokens.id_token) return loginRedirect(res, 'oauth_failed');
+    if (!tokens.id_token) return loginRedirect(res, 'oauth_failed', req);
 
     // Verifica firma, emisor, audiencia y expiración con la biblioteca oficial de Google.
     const ticket = await client.verifyIdToken({ idToken: tokens.id_token, audience: process.env.GOOGLE_CLIENT_ID });
     const profile = ticket.getPayload();
     if (!profile?.sub || !profile.email || profile.email_verified !== true || profile.nonce !== flow.nonce) {
-      return loginRedirect(res, 'google_email_unverified');
+      return loginRedirect(res, 'google_email_unverified', req);
     }
 
     const email = normalizeEmail(profile.email);
@@ -111,26 +113,27 @@ export async function googleCallback(req, res) {
       // Nunca se enlaza una cuenta local existente automáticamente: evita elevar roles por coincidencia de correo.
       const byEmail = await getAccountByEmail(email);
       const byGoogle = await getAccountByGoogleSub(profile.sub);
-      if (byEmail || byGoogle) return loginRedirect(res, 'account_exists');
+      if (byEmail || byGoogle) return loginRedirect(res, 'account_exists', req);
       const displayName = String(profile.name || email.split('@')[0]).trim().slice(0, 120) || 'Nuevo usuario';
       account = await createGoogleAccount({ email, displayName, googleSub: profile.sub });
     } else {
       account = await getAccountByGoogleSub(profile.sub);
-      if (!account) return loginRedirect(res, 'google_not_registered');
+      if (!account) return loginRedirect(res, 'google_not_registered', req);
     }
 
-    if (!account.active) return loginRedirect(res, 'account_inactive');
+    if (!account.active) return loginRedirect(res, 'account_inactive', req);
     await recordSuccessfulLogin(account.id);
     await regenerateSession(req);
     req.session.user = toPublicUser(account);
     await saveSession(req);
+
+    logInfo(flow.intent === 'register' ? 'auth.google_registration_succeeded' : 'auth.google_login_succeeded', { requestId: req.requestId, actorId: String(account.id), role: account.role, action: flow.intent, outcome: 'success', authMethod: 'google' });
 
     const target = new URL('/', FRONTEND_URL);
     target.searchParams.set('oauth', flow.intent === 'register' ? 'registered' : 'signed_in');
     return res.redirect(303, target.toString());
   } catch (error) {
     // No se exponen errores OAuth, códigos ni tokens al navegador.
-    console.error('Fallo controlado durante Google OAuth:', error.message);
-    return loginRedirect(res, error.code === '23505' ? 'account_exists' : 'oauth_failed');
+    return loginRedirect(res, error.code === '23505' ? 'account_exists' : 'oauth_failed', req);
   }
 }

@@ -1,3 +1,5 @@
+import { logInfo, logWarn } from '../utils/logger.js';
+
 function getConfiguredWebhook() {
   const configuredUrl = process.env.N8N_WEBHOOK_URL;
   const token = process.env.N8N_WEBHOOK_AUTH_TOKEN;
@@ -18,6 +20,7 @@ function getConfiguredWebhook() {
 export async function sugerenciaCompra(req, res) {
   const config = getConfiguredWebhook();
   if (!config) {
+    logWarn('assistant.request_unavailable', { requestId: req.requestId, actorId: req.user?.id === undefined ? undefined : String(req.user.id), role: req.user?.role, action: 'purchase_suggestion', outcome: 'unavailable', reason: 'not_configured' });
     return res.status(503).json({ error: 'El asistente de compras no está configurado de forma segura en el servidor' });
   }
 
@@ -44,11 +47,14 @@ export async function sugerenciaCompra(req, res) {
       return res.status(502).json({ error: 'El asistente devolvió una respuesta inválida. Revisa la ejecución del workflow.' });
     }
     res.set('Cache-Control', 'no-store');
+    logInfo('assistant.request_completed', { requestId: req.requestId, actorId: req.user?.id === undefined ? undefined : String(req.user.id), role: req.user?.role, action: 'purchase_suggestion', outcome: 'success' });
     return res.status(200).json({ ok: true, data: payload.data, error: null });
   } catch (error) {
     if (error?.name === 'AbortError') {
+      logWarn('assistant.request_failed', { requestId: req.requestId, actorId: req.user?.id === undefined ? undefined : String(req.user.id), role: req.user?.role, action: 'purchase_suggestion', outcome: 'failed', reason: 'timeout' });
       return res.status(504).json({ error: 'El asistente tardó demasiado en responder. Inténtalo de nuevo.' });
     }
+    logWarn('assistant.request_failed', { requestId: req.requestId, actorId: req.user?.id === undefined ? undefined : String(req.user.id), role: req.user?.role, action: 'purchase_suggestion', outcome: 'failed', reason: 'upstream_unavailable' });
     return res.status(502).json({ error: 'No se pudo conectar con el asistente de compras. Revisa la configuración de n8n.' });
   } finally {
     clearTimeout(timeout);

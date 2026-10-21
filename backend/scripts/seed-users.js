@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
 import { pool } from '../src/db.js';
+import { logInfo, logError } from '../src/utils/logger.js';
 
 const BCRYPT_ROUNDS = 12;
 const accounts = [
@@ -72,14 +73,15 @@ async function seed() {
   } finally {
     client.release();
   }
-  for (const account of configured) console.log(`Usuario configurado: ${account.email} (${account.role})`);
-  console.log('Listo. No se mostraron ni almacenaron contraseñas en texto plano.')
+  for (const account of configured) logInfo('users.seed_account_configured', { role: account.role, outcome: 'success' });
+  logInfo('users.seed_completed', { resultCount: configured.length, outcome: 'success' });
 }
 
 try {
   await seed();
 } catch (error) {
-  console.error(`No se pudieron configurar los usuarios: ${error.message}`);
+  logError('users.seed_failed', { errorName: error.name || 'Error' });
+  process.stderr.write('No se pudieron configurar los usuarios. Revisa las variables SEED_* de backend/.env y la conexión a PostgreSQL.\n');
   process.exitCode = 1;
 } finally {
   await pool.end();

@@ -103,3 +103,16 @@ Esta bitácora registra el proceso del proyecto. Las entradas originales del pro
 **Qué corregí o rechacé:** pendiente de completar durante la validación en mi computadora.
 
 **Verificación ejecutada aquí:** `node --check` para los archivos JavaScript del backend y `node --test tests/security-phase3.test.js` (5 pruebas pasaron). No se pudo completar `npm install` en este entorno por timeout; falta ejecutar pruebas de integración con las dependencias instaladas y comprobar el despliegue real.
+
+
+## Fase 4 — Dependencias, logs y monitoreo
+
+**Objetivo:** añadir logging estructurado redactado, eventos de auditoría, scripts npm de auditoría, Dependabot y un workflow automatizado de CI.
+
+**Resultado:** logger JSON con lista de campos permitidos, middleware `requestLogger`, eventos para auth/autorización/productos/ventas/asistente, pruebas de no-registro de secretos, configuración de Dependabot y workflow GitHub Actions.
+
+**Limitación real:** intenté generar el lockfile npm, pero el registro agotó el tiempo de espera de este entorno; no se pudo ejecutar una auditoría de vulnerabilidades válida.
+
+**Qué corregí o rechacé:**
+
+____________________________________________________

@@ -11,6 +11,7 @@ import { resumenRouter } from './routes/resumen.routes.js';
 import { reportesRouter } from './routes/reportes.routes.js';
 import { agenteRouter } from './routes/agente.routes.js';
 import { csrfProtection } from './middleware/csrfProtection.js';
+import { requestLogger } from './middleware/requestLogger.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 const sessionSecret = process.env.SESSION_SECRET;
@@ -45,6 +46,7 @@ if (!Number.isInteger(sessionMinutes) || sessionMinutes < 5 || sessionMinutes > 
 
 export const app = express();
 app.disable('x-powered-by');
+app.use(requestLogger); // ID de correlación y logs HTTP sin query, cuerpos ni cabeceras sensibles.
 if (process.env.TRUST_PROXY === 'true') {
   // Úsalo únicamente si existe un proxy inverso confiable delante de Express.
   app.set('trust proxy', 1);
