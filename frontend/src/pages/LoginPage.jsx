@@ -1,95 +1,28 @@
 import { useState } from 'react';
-import { Link, Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-
-function safeReturnPath(location) {
-  const path = location.state?.from?.pathname;
-  return typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') && path !== '/login' ? path : '/';
-}
-
-export default function LoginPage() {
-  const { user, loading, login, sessionError } = useAuth();
-  const location = useLocation();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  if (loading) return <main className="auth-check-screen" role="status"><span className="auth-spinner" /> Verificando tu sesión…</main>;
-  if (user) return <Navigate to={safeReturnPath(location)} replace />;
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setError('');
-    if (!email.trim() || !password) {
-      setError('Escribe tu correo y contraseña para continuar.');
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('Escribe un correo con formato válido.');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await login({ email: email.trim(), password });
-    } catch (requestError) {
-      setError(requestError.status === 429
-        ? requestError.message
-        : requestError.status === 401
-          ? 'No pudimos validar tus credenciales. Revisa los datos o espera si el acceso está temporalmente bloqueado.'
-          : requestError.message || 'No se pudo iniciar sesión. Inténtalo de nuevo.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <main className="login-screen">
-      <div className="login-backdrop" aria-hidden="true"><span /><span /><span /></div>
-      <section className="login-story" aria-label="Grano & Hoja">
-        <Link className="login-brand" to="/login" aria-label="Grano & Hoja, inicio de sesión">
-          <span className="login-brand-mark" aria-hidden="true">❧</span>
-          <span><strong>Grano <i>&</i> Hoja</strong><small>CAFÉ · INVENTARIO · CUIDADO</small></span>
-        </Link>
-        <div className="login-story-copy">
-          <span className="login-overline"><span /> UN ESPACIO PARA CRECER</span>
-          <h1>Del bosque a tu taza.<br /><em>Todo en equilibrio.</em></h1>
-          <p>Cuida cada ingrediente, acompaña cada venta y mantén tu cafetería en armonía.</p>
-        </div>
-        <div className="login-story-bottom">
-          <span className="login-leaf" aria-hidden="true">✳</span>
-          <div><strong>Hecho con calma, servido con cuidado.</strong><small>Gestión interna de Grano & Hoja</small></div>
-        </div>
-      </section>
-
-      <section className="login-panel" aria-labelledby="login-title">
-        <div className="login-card">
-          <div className="login-mobile-brand">
-            <span className="login-brand-mark" aria-hidden="true">❧</span>
-            <strong>Grano <i>&</i> Hoja</strong>
-          </div>
-          <span className="login-overline login-overline-light">ACCESO AL EQUIPO</span>
-          <h2 id="login-title">Qué bueno tenerte de vuelta.</h2>
-          <p className="login-intro">Inicia sesión para entrar a tu espacio de trabajo.</p>
-
-          {(error || sessionError) && <div className="login-error" role="alert"><span aria-hidden="true">!</span><p>{error || 'No pudimos comprobar tu sesión anterior. Comprueba la conexión con la API e inicia sesión.'}</p></div>}
-
-          <form className="login-form" onSubmit={handleSubmit} noValidate>
-            <label htmlFor="login-email">Correo del equipo</label>
-            <div className="login-input-wrap"><span aria-hidden="true">✉</span><input id="login-email" type="email" inputMode="email" autoComplete="username" placeholder="tu@granohoja.local" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={254} required /></div>
-
-            <div className="login-label-row"><label htmlFor="login-password">Contraseña</label></div>
-            <div className="login-input-wrap"><span aria-hidden="true">⌑</span><input id="login-password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder="Tu contraseña" value={password} onChange={(event) => setPassword(event.target.value)} maxLength={72} required /><button className="password-toggle" type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showPassword ? 'Ocultar' : 'Ver'}</button></div>
-
-            <button className="login-submit" type="submit" disabled={submitting}>
-              <span>{submitting ? 'Validando acceso…' : 'Entrar al espacio'}</span><span className="login-submit-arrow" aria-hidden="true">↗</span>
-            </button>
-          </form>
-          <div className="login-security-note"><span aria-hidden="true">✦</span><p>Acceso privado para el equipo autorizado.<br /><small>Las cuentas son creadas por la persona administradora.</small></p></div>
-          <div className="login-card-footer"><span>GRANO & HOJA</span><span>·</span><span>GESTIÓN CON CUIDADO</span></div>
-        </div>
-      </section>
-    </main>
-  );
+import LogoMark from '../components/LogoMark.jsx';
+function safeReturnPath(location){const path=location.state?.from?.pathname;return typeof path==='string'&&path.startsWith('/')&&!path.startsWith('//')&&path!=='/login'?path:'/';}
+const API_BASE_URL=(import.meta.env.VITE_API_URL||'http://localhost:3001/api').replace(/\/$/,'');
+const OAUTH_ERRORS={google_not_configured:'El acceso con Google aún no está configurado en el servidor.',invalid_intent:'No pudimos iniciar ese flujo de autenticación.',oauth_state_invalid:'La solicitud de Google caducó o no es válida. Inténtalo de nuevo.',google_cancelled:'Cancelaste la autenticación con Google.',google_email_unverified:'Google no pudo verificar el correo de esa cuenta.',account_exists:'Ya existe una cuenta con ese correo. Inicia sesión con tu método habitual.',google_not_registered:'Todavía no hay una cuenta creada con Google. Usa “Crear usuario con Google”.',account_inactive:'Tu cuenta está desactivada. Contacta con administración.',oauth_failed:'No pudimos completar la autenticación con Google. Inténtalo otra vez.'};
+function GoogleIcon(){return <svg className="google-auth-icon" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.72 7.18l7.62 5.91c4.45-4.11 7.14-10.16 7.14-17.56Z"/><path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.52 2.56 10.78l7.97-6.19Z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.89l-7.62-5.91c-2.12 1.42-4.84 2.26-8.28 2.26-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z"/></svg>}
+export default function LoginPage(){
+  const {user,loading,login,sessionError}=useAuth();const location=useLocation();const [searchParams]=useSearchParams();const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [showPassword,setShowPassword]=useState(false);const [submitting,setSubmitting]=useState(false);const [error,setError]=useState('');
+  const oauthError=OAUTH_ERRORS[searchParams.get('oauthError')]||'';
+  if(loading)return <main className="auth-check-screen" role="status"><span className="auth-spinner"/> Preparando tu espacio…</main>;
+  if(user)return <Navigate to={safeReturnPath(location)} replace/>;
+  async function handleSubmit(event){event.preventDefault();setError('');if(!email.trim()||!password)return setError('Escribe tu correo y contraseña para continuar.');if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))return setError('Escribe un correo con formato válido.');setSubmitting(true);try{await login({email:email.trim(),password});}catch(e){setError(e.status===429?e.message:e.status===401?'No pudimos validar tus credenciales. Revisa los datos o espera si el acceso está bloqueado.':e.message||'No se pudo iniciar sesión. Inténtalo de nuevo.');}finally{setSubmitting(false);}}
+  return <main className="login-screen raiz-login"><div className="login-backdrop" aria-hidden="true"><span/><span/><span/></div>
+    <section className="login-story" aria-label="Raíz & Madera"><Link className="login-brand" to="/login" aria-label="Raíz & Madera, inicio de sesión"><span className="login-brand-mark"><LogoMark/></span><span><strong>Raíz <i>&</i> Madera</strong><small>PLANTAS · MUEBLES · DECORACIÓN</small></span></Link>
+      <div className="login-story-copy"><span className="login-overline"><span/> UN ESPACIO PARA CRECER</span><h1>Haz espacio para lo natural.<br/><em>Vive rodeado de belleza.</em></h1><p>Plantas que dan vida, muebles que cuentan historias y detalles que convierten una casa en hogar.</p></div>
+      <div className="login-story-bottom"><span className="login-leaf"><LogoMark/></span><div><strong>Espacios vivos, hogares con esencia.</strong><small>Gestión de Raíz & Madera</small></div></div>
+    </section>
+    <section className="login-panel" aria-labelledby="login-title"><div className="login-card"><div className="login-mobile-brand"><span className="login-brand-mark"><LogoMark/></span><strong>Raíz <i>&</i> Madera</strong></div><span className="eyebrow login-overline-light">ACCESO AL EQUIPO</span><h2 id="login-title">Qué bueno tenerte de vuelta.</h2><p className="login-intro">Inicia sesión para cuidar cada detalle de la tienda.</p>
+      {(error||sessionError||oauthError)&&<div className="login-error" role="alert"><span>!</span><p>{error||oauthError||'No pudimos comprobar tu sesión anterior. Comprueba la conexión con la API e inicia sesión.'}</p></div>}
+      <form className="login-form" onSubmit={handleSubmit} noValidate><label htmlFor="login-email">Correo del equipo</label><div className="login-input-wrap"><span aria-hidden="true">✉</span><input id="login-email" type="email" inputMode="email" autoComplete="username" placeholder="tu@raizymadera.local" value={email} onChange={(e)=>setEmail(e.target.value)} maxLength={254} required/></div>
+        <div className="login-label-row"><label htmlFor="login-password">Contraseña</label></div><div className="login-input-wrap"><span aria-hidden="true">⌑</span><input id="login-password" type={showPassword?'text':'password'} autoComplete="current-password" placeholder="Tu contraseña" value={password} onChange={(e)=>setPassword(e.target.value)} maxLength={72} required/><button className="password-toggle" type="button" onClick={()=>setShowPassword((v)=>!v)} aria-label={showPassword?'Ocultar contraseña':'Mostrar contraseña'}>{showPassword?'Ocultar':'Ver'}</button></div>
+        <button className="login-submit" type="submit" disabled={submitting}><span>{submitting?'Validando acceso…':'Entrar al espacio'}</span><span className="login-submit-arrow" aria-hidden="true">↗</span></button>
+      </form><div className="login-auth-divider"><span>O USA TU CUENTA DE GOOGLE</span></div><a className="google-auth-button" href={`${API_BASE_URL}/auth/google/start?intent=login`}><GoogleIcon/><span>Continuar con Google</span></a><div className="login-register-prompt"><span>¿Primera vez en la tienda?</span><a href={`${API_BASE_URL}/auth/google/start?intent=register`}>Crear usuario con Google</a></div><div className="login-security-note"><span aria-hidden="true">✦</span><p>Tu correo se verifica con Google. No compartimos ni solicitamos tu contraseña de Google.<br/><small>Las cuentas nuevas reciben el perfil inicial de caja; nunca pueden asignarse permisos de administración.</small></p></div><div className="login-card-footer"><span>RAÍZ & MADERA</span><span>·</span><span>VIVE MÁS NATURAL</span></div>
+    </div></section>
+  </main>;
 }

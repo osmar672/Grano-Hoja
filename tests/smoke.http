@@ -1,22 +1,38 @@
 @baseUrl = http://localhost:3001
 
-### Salud
+### Health
 GET {{baseUrl}}/api/health
 
-### Menú con búsqueda, categoría y orden
-GET {{baseUrl}}/api/productos?q=latte&categoria=Bebidas%20calientes&orden=precio&direccion=desc
-
-### Insumos por debajo del mínimo
-GET {{baseUrl}}/api/insumos/bajo-minimo
-
-### Resumen diario
-GET {{baseUrl}}/api/resumen
-
-### Reporte de ventas de los últimos 7 días
-GET {{baseUrl}}/api/reportes/ventas-semana
-
-### Body inválido: debe responder 400 y { "error": "..." }
-POST {{baseUrl}}/api/insumos
+### Login; the cookie is managed by REST Client in VS Code
+POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
-{"nombre":"","unidad":"g","stock":-1,"stock_minimo":0}
+{
+  "email": "admin@raizymadera.local",
+  "password": "REEMPLAZA_CON_TU_PASSWORD_LOCAL"
+}
+
+### Catálogo
+GET {{baseUrl}}/api/productos?categoria=plantas&orden=nombre
+
+### Inventario por debajo del mínimo
+GET {{baseUrl}}/api/reportes/productos-bajo-stock
+
+### Ventas semanales para el asistente
+GET {{baseUrl}}/api/reportes/ventas-semana
+
+### Resumen de caja
+GET {{baseUrl}}/api/resumen
+
+### Ejemplo de validación; espera 400 con categoría no permitida
+POST {{baseUrl}}/api/productos
+Content-Type: application/json
+
+{
+  "nombre": "Producto inválido",
+  "descripcion": "Prueba de validación",
+  "precio": 12000,
+  "categoria": "comida",
+  "stock": 3,
+  "stock_minimo": 1
+}

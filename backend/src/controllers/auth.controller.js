@@ -7,7 +7,7 @@ import {
   verifyPassword,
 } from '../services/auth.service.js';
 
-const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'gh.sid';
+const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'rm.sid';
 const INVALID_CREDENTIALS = 'Credenciales incorrectas o acceso temporalmente bloqueado';
 
 function regenerateSession(req) {
@@ -69,7 +69,7 @@ export async function logout(req, res, next) {
     res.clearCookie(SESSION_COOKIE_NAME, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       path: '/',
     });
     return res.status(204).end();

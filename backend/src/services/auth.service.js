@@ -12,7 +12,7 @@ export function normalizeEmail(email) {
 
 export async function getAccountByEmail(email) {
   const result = await pool.query(
-    `SELECT id, email, display_name, password_hash, role, active,
+    `SELECT id, email, display_name, password_hash, google_sub, role, active,
             failed_login_attempts, locked_until
      FROM app_users WHERE email = $1`,
     [normalizeEmail(email)],
@@ -61,4 +61,26 @@ export function toPublicUser(account) {
     displayName: account.display_name ?? account.displayName,
     role: account.role,
   };
+}
+
+
+export async function getAccountByGoogleSub(googleSub) {
+  const result = await pool.query(
+    `SELECT id, email, display_name, password_hash, google_sub, role, active,
+            failed_login_attempts, locked_until
+     FROM app_users WHERE google_sub = $1`,
+    [googleSub],
+  );
+  return result.rows[0] || null;
+}
+
+export async function createGoogleAccount({ email, displayName, googleSub }) {
+  const result = await pool.query(
+    `INSERT INTO app_users (email, display_name, password_hash, google_sub, role, active)
+     VALUES ($1, $2, NULL, $3, 'caja', TRUE)
+     RETURNING id, email, display_name, password_hash, google_sub, role, active,
+               failed_login_attempts, locked_until`,
+    [normalizeEmail(email), displayName.trim().slice(0, 120), googleSub],
+  );
+  return result.rows[0];
 }

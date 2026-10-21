@@ -1,46 +1,27 @@
-import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useMemo,useState } from 'react';
+import { Link,useNavigate } from 'react-router-dom';
 import { api } from '../services/api.js';
 import { useFetch } from '../hooks/useFetch.js';
 import LoadingState from '../components/LoadingState.jsx';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-const money = (value) => new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC' }).format(Number(value || 0));
-export default function NewOrderPage() {
-  const { data: products, loading, error: productsError, refetch } = useFetch('/productos?activo=true&orden=nombre');
-  const [quantities, setQuantities] = useState({}); const [payment, setPayment] = useState('efectivo'); const [sending, setSending] = useState(false); const [error, setError] = useState(null); const [pendingId, setPendingId] = useState(null); const navigate = useNavigate();
-  const selected = useMemo(() => (products || []).filter((product) => Number(quantities[product.id] || 0) > 0).map((product) => ({ ...product, cantidad: Number(quantities[product.id]) })), [products, quantities]);
-  const subtotalCents = selected.reduce((sum, item) => sum + Math.round(Number(item.precio) * 100) * item.cantidad, 0);
-  const subtotal = subtotalCents / 100; const tax = Math.round(subtotalCents * 0.13) / 100; const total = subtotal + tax;
-  const setQty = (id, value) => setQuantities((current) => ({ ...current, [id]: Math.max(0, Math.min(999, Number(value) || 0)) }));
-  const submit = async (event) => {
-    event.preventDefault(); if (!selected.length) { setError({ status: 400, message: 'Agrega al menos un producto al pedido.' }); return; }
-    setSending(true); setError(null); setPendingId(null);
-    try {
-      const created = await api.post('/pedidos', { metodo_pago: payment, items: selected.map((item) => ({ producto_id: item.id, cantidad: item.cantidad })) });
-      try {
-        await api.post(`/pedidos/${created.id}/confirmar`, {});
-        navigate('/pedidos');
-      } catch (confirmationError) {
-        setPendingId(created.id);
-        setError({ ...confirmationError, message: `El pedido #${created.id} quedó pendiente porque no se pudo confirmar. ${confirmationError.message}` });
-      }
-    } catch (requestError) { setError(requestError); }
-    finally { setSending(false); }
-  };
-  if (loading) return <LoadingState message="Cargando menú y disponibilidad…" />;
-  return <section className="page-stack"><div className="page-hero"><div><span className="eyebrow">PUNTO DE VENTA</span><h1>Nuevo pedido</h1><p>Elige productos y confirma para descontar el inventario.</p></div><Link className="back-link" to="/pedidos">Ver historial →</Link></div>
-    <ErrorMessage error={productsError} onRetry={refetch} />
-    <form onSubmit={submit} className="pos-layout">
-      <section className="panel-card"><div className="section-heading"><div><span className="eyebrow">MENÚ</span><h2>Selecciona productos</h2></div><span className="muted-text">Precio por unidad</span></div>
-        {products?.length ? <div className="pos-product-list">{products.map((product) => <div className="pos-product" key={product.id}><div className="pos-product-initial">{product.nombre.slice(0,1)}</div><div className="entity-main"><strong>{product.nombre}</strong><small>{money(product.precio)} · {product.disponible ? `${product.porciones_disponibles} porciones posibles` : 'Sin insumos suficientes'}</small></div><label className="quantity-control"><span className="sr-only">Cantidad de {product.nombre}</span><button type="button" onClick={() => setQty(product.id, Number(quantities[product.id] || 0) - 1)} aria-label={`Quitar uno de ${product.nombre}`}>−</button><input aria-label={`Cantidad de ${product.nombre}`} type="number" min="0" max="999" step="1" value={quantities[product.id] || ''} onChange={(e) => setQty(product.id, e.target.value)} /><button type="button" onClick={() => setQty(product.id, Number(quantities[product.id] || 0) + 1)} aria-label={`Añadir uno de ${product.nombre}`}>＋</button></label></div>)}</div> : <EmptyState title="No hay productos activos" />}
-      </section>
-      <aside className="panel-card order-receipt"><span className="eyebrow">RESUMEN</span><h2>Tu pedido</h2><div className="receipt-items">{selected.length ? selected.map((item) => <div className="receipt-item" key={item.id}><span>{item.cantidad} × {item.nombre}</span><strong>{money(Number(item.precio) * item.cantidad)}</strong></div>) : <p className="muted-text">Todavía no has agregado productos.</p>}</div>
-        <label className="field">Método de pago<select value={payment} onChange={(e) => setPayment(e.target.value)}><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="sinpe_movil">SINPE Móvil</option></select></label>
-        <div className="receipt-totals"><div><span>Subtotal</span><strong>{money(subtotal)}</strong></div><div><span>Impuesto (13%)</span><strong>{money(tax)}</strong></div><div className="receipt-grand-total"><span>Total</span><strong>{money(total)}</strong></div></div>
-        <button className="button button-primary button-full" type="submit" disabled={sending || !selected.length}>{sending ? 'Confirmando…' : 'Crear y confirmar pedido'}</button><small className="receipt-footnote">El servidor vuelve a validar stock y calcula el monto definitivo.</small>
-        {error && <ErrorMessage error={error} />}{pendingId && <Link className="text-link" to="/pedidos">Ir al historial para revisar el pedido #{pendingId} →</Link>}
-      </aside>
+const money=(v)=>new Intl.NumberFormat('es-CR',{style:'currency',currency:'CRC'}).format(Number(v||0));
+const categoryLabel={plantas:'Plantas',muebles:'Muebles',decoracion:'Decoración'};
+export default function NewOrderPage(){
+  const {data:products,loading,error:productsError,refetch}=useFetch('/productos?activo=true&orden=nombre');
+  const [quantities,setQuantities]=useState({}); const [payment,setPayment]=useState('efectivo'); const [sending,setSending]=useState(false); const [error,setError]=useState(null); const [pendingId,setPendingId]=useState(null); const navigate=useNavigate();
+  const selected=useMemo(()=>(products||[]).filter((p)=>Number(quantities[p.id]||0)>0).map((p)=>({...p,cantidad:Number(quantities[p.id])})),[products,quantities]);
+  const subtotalCents=selected.reduce((sum,item)=>sum+Math.round(Number(item.precio)*100)*item.cantidad,0); const subtotal=subtotalCents/100; const tax=Math.round(subtotalCents*.13)/100; const total=subtotal+tax;
+  const setQty=(id,value)=>setQuantities((current)=>({...current,[id]:Math.max(0,Math.min(999,Number(value)||0))}));
+  const submit=async(event)=>{event.preventDefault();if(!['efectivo','tarjeta','sinpe_movil'].includes(payment)){setError({status:400,message:'Selecciona un método de pago válido.'});return;}if(!selected.length||selected.some((item)=>!Number.isInteger(item.cantidad)||item.cantidad<1||item.cantidad>999)){setError({status:400,message:'Añade productos y usa cantidades enteras entre 1 y 999.'});return;}
+    setSending(true);setError(null);setPendingId(null);try{const created=await api.post('/pedidos',{metodo_pago:payment,items:selected.map((item)=>({producto_id:item.id,cantidad:item.cantidad}))});try{await api.post(`/pedidos/${created.id}/confirmar`,{});navigate('/pedidos');}catch(confirmError){setPendingId(created.id);setError({...confirmError,message:`La venta #${created.id} quedó pendiente. ${confirmError.message}`});}}catch(e){setError(e);}finally{setSending(false);}};
+  if(loading)return <LoadingState message="Cargando productos y existencias…"/>;
+  return <section className="page-stack"><div className="page-hero"><div><span className="eyebrow">PUNTO DE VENTA</span><h1>Registrar una venta</h1><p>Elige productos y confirma para descontar las existencias del inventario.</p></div><Link className="back-link" to="/pedidos">Historial de ventas →</Link></div>
+    <ErrorMessage error={productsError} onRetry={refetch}/>
+    <form onSubmit={submit} className="pos-layout"><section className="panel-card"><div className="section-heading"><div><span className="eyebrow">CATÁLOGO</span><h2>Elige las piezas</h2></div><span className="muted-text">Precio por unidad</span></div>
+      {products?.length?<div className="pos-product-list">{products.map((p)=><div className="pos-product" key={p.id}><div className={`pos-product-initial category-${p.categoria}`}>{p.categoria==='plantas'?'♧':p.categoria==='muebles'?'⌂':'✳'}</div><div className="entity-main"><strong>{p.nombre}</strong><small>{categoryLabel[p.categoria]} · {money(p.precio)} · stock: {p.stock}</small>{p.stock===0&&<small className="text-danger">Agotado; la API rechazará la confirmación.</small>}</div><label className="quantity-control"><span className="sr-only">Cantidad de {p.nombre}</span><button type="button" aria-label={`Restar ${p.nombre}`} onClick={()=>setQty(p.id,Number(quantities[p.id]||0)-1)}>−</button><input type="number" min="0" max="999" value={quantities[p.id]||0} onChange={(e)=>setQty(p.id,e.target.value)}/><button type="button" aria-label={`Sumar ${p.nombre}`} onClick={()=>setQty(p.id,Number(quantities[p.id]||0)+1)}>＋</button></label></div>)}</div>:<EmptyState title="No hay productos activos"/>}</section>
+      <aside className="panel-card receipt-card"><span className="eyebrow">RESUMEN DE VENTA</span><h2>Tu selección</h2>{selected.length?<div className="receipt-lines">{selected.map((item)=><div key={item.id}><span>{item.cantidad} × {item.nombre}</span><strong>{money(Number(item.precio)*item.cantidad)}</strong></div>)}</div>:<p className="muted-text">Selecciona productos para calcular el total.</p>}
+        <label className="field">Método de pago<select value={payment} onChange={(e)=>setPayment(e.target.value)}><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="sinpe_movil">SINPE Móvil</option></select></label><div className="receipt-totals"><div><span>Subtotal</span><strong>{money(subtotal)}</strong></div><div><span>Impuesto (13%)</span><strong>{money(tax)}</strong></div><div className="receipt-grand-total"><span>Total</span><strong>{money(total)}</strong></div></div><button className="button button-primary button-full" type="submit" disabled={sending||!selected.length}>{sending?'Procesando…':'Crear y confirmar venta'}</button><small className="receipt-footnote">El servidor valida el stock otra vez y registra la venta de forma atómica.</small>{error&&<ErrorMessage error={error}/ >}{pendingId&&<Link className="text-link" to="/pedidos">Ver venta pendiente #{pendingId} →</Link>}</aside>
     </form>
   </section>;
 }

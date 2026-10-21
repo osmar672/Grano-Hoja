@@ -1,277 +1,235 @@
-# Grano & Hoja ☕
+# Raíz & Madera
 
-Sistema de punto de venta e inventario por insumos para una cafetería. Proyecto individual del Laboratorio #2: Node.js + Express + PostgreSQL, React + Vite y un agente de compras con n8n.
+Sistema de gestión para una tienda de **plantas, muebles y decoración**. Incluye catálogo, inventario por unidades, ventas, cierre de caja y un asistente de reposición con n8n. La identidad visual conserva la temática de bosque verde oscuro, crema y motivos botánicos, con animaciones CSS sutiles.
 
-> **Estado de esta entrega:** incluye implementación inicial integrada de backend, frontend, esquema y datos de muestra, colección Postman, workflow n8n sin credenciales y documentación. El workflow requiere que selecciones una credencial de modelo de chat en tu instancia n8n. Antes de una entrega evaluada, sigue la lista de pruebas y confirma el funcionamiento en tu propio entorno.
+> **Nota sobre el alcance académico:** este proyecto reemplaza el caso original de cafetería por una tienda de decoración, tal como se solicitó durante el rediseño. Si la evaluación exige mantener literalmente el Caso 1 de la rúbrica del Laboratorio #2, confirma con el docente que acepta este cambio de dominio. Se mantienen las características técnicas de CRUD, sesión, roles, transacciones, reportes, frontend y agente.
 
-## Contenido
+## Funciones
 
-- `schema.sql`: las cinco tablas del caso y datos de demostración.
-- `backend/`: API REST por capas (rutas, controladores, servicios, Pool de PostgreSQL).
-- `frontend/`: aplicación React con React Router y CSS propio.
-- `n8n/workflow_grano_hoja.json`: workflow importable de agente de compras sin credenciales.
-- `tests/Grano-Hoja.postman_collection.json`: requests iniciales para Postman.
-- `BITACORA_IA.md`: registro de decisiones y prompts importantes.
-- `docs/`: guía de arquitectura, pruebas y defensa individual.
+- Inicio de sesión mediante sesión almacenada en PostgreSQL; contraseñas con bcrypt y límite de intentos.
+- Roles `admin`, `encargado` y `caja`, autorizados en el backend.
+- Catálogo de plantas, muebles y decoración con búsqueda, filtros y ordenamiento.
+- CRUD de productos, incluyendo precio, descripción, categoría, existencias, mínimo de reposición y estado activo.
+- Ventas con precio histórico por línea, impuesto de demostración del 13 %, método de pago y estado.
+- Confirmación de venta en transacción: bloquea los productos por ID, valida existencias y descuenta stock sin permitir cantidades negativas.
+- Anulación de venta confirmada durante los primeros 15 minutos desde la confirmación; el stock se devuelve dentro de la transacción. Las pendientes se pueden anular sin ajustar stock.
+- Panel con total diario por método de pago, cinco artículos más vendidos y alertas de bajo stock.
+- Reportes de productos por debajo del mínimo y ventas de los últimos siete días; el agente redacta sugerencias, pero no modifica existencias.
+- Diseño adaptable y animaciones que respetan `prefers-reduced-motion`.
+
+## Estructura
+
+```text
+Raiz-y-Madera/
+├── schema.sql
+├── compose.yaml
+├── backend/
+│   ├── src/routes/          # Endpoints REST
+│   ├── src/controllers/     # Entrada/salida HTTP
+│   ├── src/services/        # SQL y reglas de negocio
+│   ├── src/middleware/      # Sesión, roles, validación y errores
+│   ├── src/validation/      # Esquemas Zod
+│   └── scripts/seed-users.js
+├── frontend/
+│   └── src/                 # React, páginas, componentes, hooks y servicios
+├── n8n/workflow_raiz_madera.json
+├── tests/Raiz-y-Madera.postman_collection.json
+├── SECURITY.md
+└── BITACORA_IA.md
+```
 
 ## Requisitos
 
-- Node.js 20 o superior y npm.
-- PostgreSQL 14 o superior.
-- Para el agente: una instancia de n8n y una credencial válida para el modelo de chat que configures.
+- Node.js 20+ y npm.
+- Docker Desktop con Docker Compose, o PostgreSQL 14+ instalado.
+- Para el agente, una instancia n8n y una credencial para el modelo de chat que elijas.
 
-## 1. Preparar PostgreSQL
+## 1. Preparar PostgreSQL (Windows / Docker Desktop)
 
-**Opción A (Docker Desktop):** desde la raíz copia `.env.example` a `.env`, define tu contraseña local en `POSTGRES_PASSWORD` y ejecuta `docker compose up -d db`. Compose carga `schema.sql` automáticamente la primera vez que se crea el volumen. En `backend/.env`, configura `DATABASE_URL=postgresql://postgres:TU_PASSWORD@localhost:5432/grano_hoja`, reemplazando `TU_PASSWORD` por exactamente la misma contraseña que elegiste. El archivo `.env` está excluido de Git. Si necesitas reiniciar la base de demostración desde cero, `docker compose down -v` elimina también el volumen y todos sus datos; después ejecuta `docker compose up -d db` otra vez.
-
-**Opción B (PostgreSQL instalado):** crea la base de datos y carga el esquema desde la raíz del repositorio:
-
-```bash
-createdb grano_hoja
-psql -d grano_hoja -f schema.sql
-```
-
-Si `createdb` no está disponible, crea `grano_hoja` desde pgAdmin y ejecuta `schema.sql` en Query Tool. **Aviso:** el script comienza con `DROP TABLE IF EXISTS`; está diseñado para reiniciar los datos de demostración y elimina las tablas del caso existentes en esa base.
-
-Comprueba los datos:
-
-```sql
-SELECT COUNT(*) FROM productos;
-SELECT COUNT(*) FROM insumos;
-SELECT estado, COUNT(*) FROM pedidos GROUP BY estado;
-SELECT * FROM insumos WHERE stock < stock_minimo;
-```
-
-### Atajo para Windows PowerShell
-
-Si tienes Docker Desktop, desde la raíz abre una terminal PowerShell y ejecuta:
+Desde la raíz del proyecto, abre PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
 notepad .env
-# cambia POSTGRES_PASSWORD por una contraseña local
+```
+
+Define `POSTGRES_PASSWORD` con una contraseña propia. Luego crea la base:
+
+```powershell
 docker compose up -d db
+```
+
+PostgreSQL ejecuta `schema.sql` automáticamente al inicializar un volumen nuevo. Si vienes de la versión Grano & Hoja y tienes el volumen antiguo, los inicializadores no se ejecutan otra vez. Para una base de demostración desechable puedes reiniciar desde cero:
+
+```powershell
+docker compose down -v
+docker compose up -d db
+```
+
+**Advertencia:** `docker compose down -v` elimina los datos de la base anterior. No lo ejecutes si necesitas conservarlos. También puedes crear una base nueva `raiz_madera` y cargar `schema.sql` en pgAdmin o con `psql`.
+
+Comprobaciones SQL:
+
+```sql
+SELECT COUNT(*) FROM productos;
+SELECT categoria, COUNT(*) FROM productos GROUP BY categoria;
+SELECT nombre, stock, stock_minimo FROM productos WHERE stock < stock_minimo;
+SELECT estado, COUNT(*) FROM pedidos GROUP BY estado;
+```
+
+## 2. Configurar y ejecutar el backend
+
+Copia las variables de ejemplo y edita el archivo local:
+
+```powershell
 Copy-Item backend/.env.example backend/.env
 notepad backend/.env
 ```
 
-En `backend/.env`, coloca la misma contraseña que escribiste en `.env` de la raíz, por ejemplo `DATABASE_URL=postgresql://postgres:TU_PASSWORD@localhost:5432/grano_hoja`. Después abre una terminal para el backend y otra para el frontend, tal como indican los siguientes pasos.
-
-## 2. Iniciar la API
-
-```bash
-cd backend
-npm install
-```
-
-Copia `backend/.env.example` como `backend/.env`, conserva sus variables y ajusta `DATABASE_URL` a tu PostgreSQL. Genera `SESSION_SECRET` con el comando de la sección **Autenticación (Fase 1)**; el servidor no arranca deliberadamente si falta o es débil.
-
-Después de levantar la base de datos, aplica la migración si tu volumen ya existía, instala dependencias y crea las cuentas del equipo:
-
-```powershell
-npm install
-npm run users:seed
-npm run dev
-```
-
-Comprueba la API:
-
-```bash
-curl http://localhost:3001/api/health
-curl -i http://localhost:3001/api/productos
-```
-
-La salud debe responder `200` y `{"ok":true,"message":"API Grano & Hoja activa"}`. El listado de productos sin cookie debe responder `401` porque los endpoints de negocio requieren sesión. Inicia sesión para probar el resto de endpoints.
-
-## 3. Iniciar React
-
-En otra terminal:
-
-```bash
-cd frontend
-npm install
-```
-
-Copia `frontend/.env.example` a `frontend/.env`:
-
-```env
-VITE_API_URL=http://localhost:3001/api
-VITE_N8N_WEBHOOK_URL=http://localhost:5678/webhook/grano-hoja/asistente-compras
-```
-
-Inicia Vite:
-
-```bash
-npm run dev
-```
-
-Abre la URL que muestra Vite, normalmente `http://localhost:5173`. No abras `index.html` con doble clic: React necesita el servidor de Vite.
-
-## 4. Configurar n8n
-
-Importa `n8n/workflow_grano_hoja.json` en n8n. Abre **OpenAI Chat Model** y selecciona/crea tu credencial de modelo. El JSON no contiene credenciales. Activa el workflow y copia la **Production URL** del nodo Webhook a `VITE_N8N_WEBHOOK_URL`.
-
-El workflow exportado trae `http://host.docker.internal:3001/api` en los dos HTTP Request Tool, útil cuando n8n corre en Docker Desktop y la API corre en el host. Si n8n corre directamente en el mismo equipo, cambia ambas URLs a `http://localhost:3001/api`. En n8n Cloud debe ser una URL HTTPS pública que pueda alcanzar la API; `localhost` de tu PC no es accesible desde la nube.
-
-El nodo Webhook permite el origen `http://localhost:5173` mediante CORS. Para despliegue, cambia el origen por el dominio real del frontend.
-
-## Diagrama entidad-relación
-
-```mermaid
-erDiagram
-  PRODUCTOS ||--o{ RECETAS : tiene
-  INSUMOS ||--o{ RECETAS : utiliza
-  PEDIDOS ||--|{ PEDIDO_ITEMS : contiene
-  PRODUCTOS ||--o{ PEDIDO_ITEMS : vendido_en
-  PRODUCTOS {
-    int id PK
-    string nombre
-    numeric precio
-    string categoria
-    boolean activo
-  }
-  INSUMOS {
-    int id PK
-    string nombre
-    string unidad
-    numeric stock
-    numeric stock_minimo
-  }
-  RECETAS {
-    int id PK
-    int producto_id FK
-    int insumo_id FK
-    numeric cantidad
-  }
-  PEDIDOS {
-    int id PK
-    timestamptz fecha
-    timestamptz fecha_confirmacion
-    string metodo_pago
-    numeric subtotal
-    numeric impuesto
-    numeric total
-    string estado
-  }
-  PEDIDO_ITEMS {
-    int id PK
-    int pedido_id FK
-    int producto_id FK
-    int cantidad
-    numeric precio_unitario
-  }
-```
-
-## Rutas principales
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET/POST | `/api/insumos` | Listar/crear insumos |
-| GET/PUT/PATCH/DELETE | `/api/insumos/:id` | Detalle/editar/eliminar insumo |
-| GET | `/api/insumos/bajo-minimo` | Insumos con stock menor al mínimo |
-| GET/POST | `/api/productos` | Listar/crear productos y recetas |
-| GET/PUT/PATCH/DELETE | `/api/productos/:id` | Detalle/editar/eliminar producto |
-| GET/POST | `/api/pedidos` | Historial/crear pedido pendiente |
-| GET | `/api/pedidos/:id` | Pedido y líneas históricas |
-| POST | `/api/pedidos/:id/confirmar` | Valida inventario y descuenta dentro de transacción |
-| POST | `/api/pedidos/:id/anular` | Anula y, cuando corresponde, devuelve insumos |
-| GET | `/api/resumen?fecha=YYYY-MM-DD` | Cierre de caja por día local |
-| GET | `/api/reportes/ventas-semana` | Ventas y consumo estimado últimos 7 días |
-| POST | `/api/auth/login` | Iniciar sesión; limita intentos y crea cookie HttpOnly |
-| GET | `/api/auth/me` | Consultar el usuario autenticado |
-| POST | `/api/auth/logout` | Destruir la sesión server-side |
-| GET | `/api/health` | Comprobación de salud (pública) |
-
-Los errores se responden como `{ "error": "mensaje" }`. Los conflictos de stock, transición de estado o referencias se responden con `409`.
-
-## Reglas relevantes
-
-- El pedido se crea en estado `pendiente`; confirmar valida recetas de **todas** las líneas agrupadas por insumo y bloquea inventario con `SELECT ... FOR UPDATE`.
-- El servidor calcula subtotal y 13% de impuesto, redondeado a 2 decimales; cada item guarda el precio histórico.
-- Solo se anula una venta confirmada durante los primeros 15 minutos desde `fecha_confirmacion`. Anular un pedido pendiente no toca stock.
-- No se borran pedidos. Insumos referenciados por recetas y productos incluidos en pedidos históricos no se pueden borrar.
-- Para que una anulación no devuelva cantidades equivocadas, la API impide cambiar la receta de un producto durante la ventana activa de anulación.
-- Hora de negocio: `America/Costa_Rica`; el resumen agrupa por la fecha local de confirmación.
-
-## Pruebas
-
-Importa `tests/Grano-Hoja.postman_collection.json` en Postman y configura `baseUrl` como `http://localhost:3001`, `loginEmail` y `loginPassword` con una cuenta creada localmente. Ejecuta `Login` primero; Postman conserva la cookie para las siguientes peticiones. Para una prueba manual crítica, crea un pedido con una cantidad de frappés superior a sus porciones disponibles e intenta confirmar: se espera `409` con un mensaje de insumos insuficientes.
-
-Consulta `docs/PRUEBAS_Y_DEFENSA.md` para casos de 400/404/409, concurrencia, guion de demo y preguntas de defensa. No declares una prueba como aprobada hasta ejecutarla localmente.
-
-## Git
-
-```bash
-git init
-git add .
-git commit -m "feat: implementar Grano & Hoja con API y frontend"
-```
-
-Si ya creaste el repositorio remoto, añade el remoto y realiza `git push -u origin main`. Nunca subas `.env` ni credenciales.
-
-## Rediseño visual
-La interfaz usa una dirección botánica inspirada en la presentación forestal: navegación en verde bosque, superficies crema, cabeceras ilustradas, tarjetas de métricas con profundidad y animaciones de entrada/hover. Es responsive y respeta `prefers-reduced-motion`. El diseño está descrito en [`docs/REDISENO_VISUAL.md`](docs/REDISENO_VISUAL.md).
-
-
-## Autenticación (Fase 1)
-
-La interfaz ahora tiene un login y las rutas de negocio de la API requieren una sesión server-side. No hay cuentas con contraseñas predeterminadas: las contraseñas de tres cuentas se definen localmente en `backend/.env`.
-
-### Configurar variables
-
-```powershell
-Copy-Item .env.example .env
-Copy-Item backend/.env.example backend/.env
-Copy-Item frontend/.env.example frontend/.env
-```
-
-En `backend/.env`, usa la misma contraseña PostgreSQL configurada en `.env`, crea un `SESSION_SECRET` de al menos 32 bytes (recomendado, 48 bytes aleatorios) y define `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_PASSWORD` y `SEED_CASHIER_PASSWORD` con claves distintas.
-
-Genera un secreto en PowerShell:
+En `backend/.env`, conserva las variables e introduce la misma contraseña PostgreSQL que configuraste en la raíz, en `DATABASE_URL`. Genera un secreto para la sesión:
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
-### Base existente: aplicar migración de usuarios
+Pega ese valor en `SESSION_SECRET`. Define tres contraseñas distintas en `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_PASSWORD` y `SEED_CASHIER_PASSWORD`. Cada una debe tener al menos 12 caracteres, incluir mayúscula, minúscula y número y no superar 72 bytes. No las pongas en Git ni en capturas.
 
-Si PostgreSQL ya cargó `schema.sql` antes de añadir login, aplica esta migración una vez:
-
-```powershell
-Get-Content backend/migrations/001_auth.sql | docker compose exec -T db psql -U postgres -d grano_hoja
-```
-
-Si cambiaste `POSTGRES_USER` o `POSTGRES_DB`, sustituye `postgres` y `grano_hoja` por los valores configurados. En una base nueva la tabla `app_users` viene incluida en `schema.sql`.
-
-### Crear tres cuentas
+Luego ejecuta:
 
 ```powershell
 cd backend
 npm install
 npm run users:seed
+npm run check
+npm test
 npm run dev
 ```
 
-Se aprovisionan estas cuentas, con correo y rol configurables en `backend/.env`:
+La API queda en `http://localhost:3001`. Prueba `http://localhost:3001/api/health`; debe devolver `200` y `{"ok":true,"message":"API Raíz & Madera activa"}`. Los endpoints comerciales devuelven `401` si no hay sesión activa.
 
-- `SEED_ADMIN_EMAIL` — rol `admin`.
-- `SEED_MANAGER_EMAIL` — rol `encargado`.
-- `SEED_CASHIER_EMAIL` — rol `caja`.
+### Registro y acceso con Google
 
-El script rechaza claves vacías, débiles o repetidas por cuenta. Si se vuelve a ejecutar, actualiza las claves y datos de las cuentas configuradas.
+La pantalla `/login` ofrece **Continuar con Google** y **Crear usuario con Google**. La integración usa el flujo OAuth 2.0 Authorization Code del servidor con la biblioteca oficial `google-auth-library`, `state`, `nonce`, PKCE S256 y verificación del ID token. Solo se solicitan los scopes OpenID `openid`, `email` y `profile`; la aplicación no lee el buzón ni pide la contraseña de Google. Google exige que el URI de redirección coincida exactamente con el configurado en Cloud Console.
 
-En otra terminal:
+1. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials), crea o selecciona un proyecto y configura la pantalla de consentimiento OAuth.
+2. Crea credenciales de **OAuth client ID** de tipo **Web application**.
+3. Añade este URI en **Authorized redirect URIs**: `http://localhost:3001/api/auth/google/callback`. Para producción, usa el callback HTTPS exacto de tu dominio.
+4. Copia `backend/.env.example` a `backend/.env` y define `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` y `FRONTEND_URL`. Nunca pongas el secreto en una variable `VITE_`.
+5. Ejecuta la migración `backend/migrations/002_google_oauth.sql` en la base de datos existente, reinicia el backend y prueba primero con un usuario de test de la pantalla de consentimiento.
+
+Para una base nueva, `schema.sql` ya incluye los campos; la migración 002 crea además el índice único del identificador de Google. En PowerShell, desde la raíz del proyecto, puedes aplicar la migración así (ajusta el usuario/base si los personalizaste):
 
 ```powershell
+Get-Content backend/migrations/002_google_oauth.sql | docker compose exec -T db psql -U postgres -d raiz_madera
+```
+
+El registro de Google crea una cuenta con rol inicial `caja` y nunca permite elegir `admin` ni `encargado`. Si el correo ya existe como cuenta local, no se enlaza de forma automática; así se evita elevar privilegios por coincidencia de correo. Esa cuenta sigue entrando con su método habitual. La sesión se regenera después del callback. La cookie utiliza `SameSite=Lax` porque el callback OAuth llega como navegación GET desde Google; conserva `HttpOnly` y `Secure` en producción.
+
+### Usuarios iniciales
+
+Los correos de muestra se configuran en `backend/.env`:
+
+- `admin@raizymadera.local` — administración y todas las operaciones.
+- `encargado@raizymadera.local` — catálogo, operaciones y asistente de reposición; no elimina productos.
+- `caja@raizymadera.local` — consulta catálogo, registra ventas y consulta cierre/alertas; no modifica catálogo ni usa el asistente.
+
+Las contraseñas no se distribuyen en el ZIP. Tú las defines en `.env` y el script guarda hashes bcrypt.
+
+## 3. Ejecutar el frontend
+
+Abre otra terminal desde la raíz:
+
+```powershell
+Copy-Item frontend/.env.example frontend/.env
 cd frontend
 npm install
 npm run dev
 ```
 
-Abre `http://localhost:5173`. Para el entorno local el backend usa `http://localhost:3001/api` y la cookie no lleva `Secure` porque HTTP local no es HTTPS. En producción, `NODE_ENV=production` activa `Secure`, pero necesitas configurar TLS real; sigue `SECURITY.md` antes de desplegar.
+Abre la URL que muestre Vite (normalmente `http://localhost:5173`). No abras `index.html` con doble clic. El frontend usa `VITE_API_URL=http://localhost:3001/api` y mantiene la cookie de sesión mediante `credentials: 'include'`.
 
-### Importante: roles
+## 4. Flujo de venta e inventario
 
-Esta fase guarda y muestra los roles, pero todavía no limita operaciones según el rol. La matriz de permisos del servidor y los controles contra IDOR corresponden a la Fase 2. No publiques la aplicación hasta completarla.
+1. La persona selecciona productos y cantidades en `/pedidos/nuevo`.
+2. La API crea una venta pendiente y guarda el precio unitario de cada línea.
+3. La pantalla solicita la confirmación. El backend vuelve a leer y bloquear los productos dentro de una transacción.
+4. Si el stock agregado para cualquiera de los productos no alcanza, responde `409`, hace `ROLLBACK` y no descuenta parcialmente.
+5. Si alcanza, descuenta stock y pone la venta en `confirmado`.
+6. Durante 15 minutos desde `fecha_confirmacion`, se puede anular. En ese caso, se devuelve stock y el pedido pasa a `anulado`. Fuera del plazo la API devuelve `409`.
+7. Las ventas anuladas no cuentan en el cierre de caja.
 
-Consulta [`SECURITY.md`](./SECURITY.md) y [`docs/SECURITY_AUDIT_PHASE1.md`](./docs/SECURITY_AUDIT_PHASE1.md) para el estado completo.
+El impuesto del 13 % se conserva como regla del ejercicio. Si la tienda operara realmente, verifica el tratamiento fiscal que corresponda antes de usar el sistema con datos de producción.
+
+## 5. API disponible
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/api/health` | Salud del servidor |
+| POST | `/api/auth/login` | Inicio de sesión con rate limit |
+| GET | `/api/auth/google/start?intent=login` | Inicio con cuenta Google ya vinculada |
+| GET | `/api/auth/google/start?intent=register` | Crear usuario nuevo verificando Google (rol inicial caja) |
+| GET | `/api/auth/google/callback` | Callback OAuth validado por el servidor |
+| GET | `/api/auth/me` | Usuario de la sesión actual |
+| POST | `/api/auth/logout` | Destruir sesión |
+| GET | `/api/productos` | Catálogo con `q`, `categoria`, `orden`, `direccion`, `activo`, `bajo_stock` |
+| POST | `/api/productos` | Crear producto (`admin`, `encargado`) |
+| GET | `/api/productos/:id` | Detalle y ventas recientes agregadas |
+| PUT / PATCH | `/api/productos/:id` | Editar producto (`admin`, `encargado`) |
+| DELETE | `/api/productos/:id` | Eliminar producto (`admin`); no permite borrar un producto con ventas históricas |
+| GET | `/api/pedidos` | Historial con `estado` y `metodo_pago` opcionales |
+| POST | `/api/pedidos` | Crear venta pendiente con items |
+| GET | `/api/pedidos/:id` | Detalle de venta e items |
+| POST | `/api/pedidos/:id/confirmar` | Confirmar y descontar inventario en transacción |
+| POST | `/api/pedidos/:id/anular` | Anular dentro de las reglas del negocio |
+| GET | `/api/resumen?fecha=YYYY-MM-DD` | Cierre de caja del día en `America/Costa_Rica` |
+| GET | `/api/reportes/productos-bajo-stock` | Alerta de productos bajo mínimo (sesión autorizada o token de servicio) |
+| GET | `/api/reportes/ventas-semana` | Unidades vendidas, stock actual y cantidad sugerida (admin/encargado o token de servicio) |
+| POST | `/api/agente/sugerencia-compra` | Proxy autenticado al asistente privado de n8n (admin/encargado) |
+
+Errores en HTTP se devuelven como `{ "error": "mensaje" }`. Los códigos relevantes son `400` para datos inválidos, `401` para falta de sesión, `403` para rol sin permisos, `404` para ID inexistente y `409` para conflictos como stock insuficiente, duplicados o anulación vencida.
+
+## 6. Configurar n8n
+
+Importa `n8n/workflow_raiz_madera.json`. En el nodo **OpenAI Chat Model**, selecciona una credencial de modelo de chat. El JSON no contiene credenciales.
+
+En `backend/.env` configura:
+
+- `N8N_WEBHOOK_URL`: URL real del webhook activado.
+- `N8N_WEBHOOK_AUTH_TOKEN`: secreto largo que también se configura como credencial **Header Auth** del nodo Webhook usando el header `x-rm-webhook-token`.
+- `N8N_API_SERVICE_TOKEN`: otro secreto diferente, para los HTTP Request Tools de n8n hacia la API usando el header `x-service-token`.
+
+React **no** llama al webhook directamente; utiliza `POST /api/agente/sugerencia-compra`. Los secretos de servicio permanecen en backend/n8n, nunca en variables `VITE_`. Ajusta las URLs de las herramientas si n8n se ejecuta fuera del Docker Desktop del host:
+
+- n8n en Docker y API en el host: normalmente `http://host.docker.internal:3001/api`.
+- n8n en el mismo host sin Docker: `http://localhost:3001/api`.
+- n8n Cloud: la API debe ser accesible por una URL HTTPS desde la nube; `localhost` no funciona allí.
+
+El agente lee productos de bajo stock y reporte semanal y responde `{ ok, data, error }`. Solo redacta recomendaciones; no actualiza stock ni crea órdenes.
+
+## 7. Pruebas manuales / Postman
+
+Importa `tests/Raiz-y-Madera.postman_collection.json` en Postman. Define `adminPassword` y `cashierPassword` como variables de colección solo en tu entorno local y ejecuta la colección de arriba abajo: primero comprueba que caja no puede administrar el catálogo, luego inicia sesión como admin y corre el CRUD y las ventas. Postman mantiene la cookie de sesión.
+
+La colección incluye health, login, sesión, catálogo, reportes, CRUD de producto temporal, crear/confirmar/anular una venta y logout. Comprueba también manualmente que:
+
+- Sin cookie `GET /api/productos` devuelve `401`.
+- El rol `caja` recibe `403` al intentar `POST /api/productos`.
+- Crear o confirmar una venta con más unidades de las disponibles responde `409` y deja el stock sin cambios.
+- Una anulación fuera de los 15 minutos devuelve `409`.
+- Un texto HTML en `nombre` o `descripcion` es rechazado con `400`.
+
+## 8. Seguridad, datos personales y despliegue
+
+Consulta `SECURITY.md` para medidas, pendientes y configuración. Las medidas actuales incluyen sesión server-side en PostgreSQL, cookie HttpOnly/SameSite, hash bcrypt, bloqueo temporal de login, rate limiting, autorización por rol, esquemas Zod estrictos, SQL parametrizado y secretos en `.env`.
+
+La configuración de HTTPS/HSTS/CSP/CSRF para producción, copias de seguridad cifradas y una ejecución completa de OWASP ZAP siguen requiriendo despliegue/pruebas externas. No lo publiques como sistema de producción hasta completar los pendientes, probar restauración de backups, revisar `npm audit` en tu entorno y configurar HTTPS en el proxy/hosting. Para datos personales, minimiza los datos recogidos y revisa los avisos de privacidad y consentimiento de acuerdo con la Ley 8968 de Costa Rica antes de operar con clientes reales.
+
+## 9. Git
+
+```bash
+git init
+git add .
+git commit -m "feat: transformar el sistema en Raíz & Madera"
+```
+
+Si ya existe un remoto, usa `git remote -v` para verificarlo y después `git push`. No agregues `.env`, tokens, contraseñas ni credenciales exportadas.

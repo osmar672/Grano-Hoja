@@ -1,61 +1,94 @@
-# BITÁCORA DE USO DE IA — Grano & Hoja
+# BITÁCORA DE USO DE IA — Raíz & Madera
 
-> Registro inicial de prompts utilizados para construir y revisar la solución. Antes de la defensa, agrega los resultados de tus pruebas reales y explica qué entiendes de cada bloque. El campo **Qué corregí o rechacé** debe reflejar tus decisiones, no copiarse sin revisar.
+Esta bitácora registra el proceso del proyecto. Las entradas originales del prototipo eran para la cafetería Grano & Hoja; el prompt final de transformación cambió explícitamente el dominio a una tienda de plantas, muebles y decoración. La documentación y el código de esta versión deben tomarse como la base actual.
 
-## Prompt 1 — Modelo de datos
-**Prompt usado:** Diseña un esquema PostgreSQL para una cafetería con insumos, productos, recetas, pedidos y pedido_items, relaciones, restricciones CHECK/NOT NULL y datos de ejemplo realistas. No implementes combos.
+## 1. Diseño inicial de la interfaz
 
-**Qué devolvió la IA:** `schema.sql` con cinco tablas, claves foráneas, índices, diez insumos, ocho productos, recetas y quince pedidos distribuidos en siete días.
+**Prompt usado:** Rediseña la interfaz existente con temática de bosque, verdes profundos, crema, motivos botánicos, transiciones sutiles y soporte para reducir movimiento, sin añadir librerías de interfaz.
 
-**Qué corregí o rechacé:** _Completar después de revisar schema.sql y cargarlo en PostgreSQL._
+**Qué devolvió la IA:** identidad visual, navegación lateral adaptable, componentes con animación de entrada y estilos propios.
 
-## Prompt 2 — API segura por capas
-**Prompt usado:** Implementa una API Node.js/Express por rutas, controladores y servicios con PostgreSQL, consultas parametrizadas, validación, códigos 200/201/400/404/409, y errores `{ error }`.
-
-**Qué devolvió la IA:** backend con Pool, AppError, middleware central y CRUD para insumos/productos.
-
-**Qué corregí o rechacé:** _Completar tras ejecutar y probar endpoints._
-
-## Prompt 3 — Inventario y transacciones
-**Prompt usado:** Implementa confirmación y anulación de pedidos con BEGIN/COMMIT/ROLLBACK, SELECT FOR UPDATE ordenado por id, agregación de necesidades compartidas, 13% de impuesto y ventana de anulación de 15 minutos.
-
-**Qué devolvió la IA:** servicios transaccionales de pedido y consulta SQL para resumen diario y reporte semanal.
-
-**Qué corregí o rechacé:** _Completar después de comprobar stock antes/después y los casos 409._
-
-## Prompt 4 — Frontend React
-**Prompt usado:** Crea un frontend React/Vite con React Router, capa services/api.js, hook useFetch, formularios controlados, estados loading/error/empty, CRUD, filtros, búsqueda, orden y tarjetas de métricas. Usa CSS propio sin librerías UI.
-
-**Qué devolvió la IA:** vistas Panel, Productos, Detalle, Insumos, Pedidos, Nuevo pedido y Asistente, con componentes reutilizables y variables CSS de café/verde/crema.
-
-**Qué corregí o rechacé:** _Completar después de ejecutar Vite y probar flujo por flujo._
-
-## Prompt 5 — Agente n8n
-**Prompt usado:** Genera un workflow n8n importable con Webhook POST, validación de entrada, AI Agent, modelo de chat, HTTP Request Tools para bajo mínimo y ventas semanales, Respond to Webhook y contrato `{ ok, data, error }`. No incluyas credenciales.
-
-**Qué devolvió la IA:** `n8n/workflow_grano_hoja.json` sin tokens ni IDs de credenciales; debe seleccionarse la credencial de modelo al importar y configurarse la URL de la API según el entorno.
-
-**Qué corregí o rechacé:** _Completar luego de importar, configurar, activar y probar con curl._
-
-## Prompt 6 — Alineación con rúbrica y pruebas
-**Prompt usado:** Revisa el proyecto frente a la rúbrica del Laboratorio #2 e incluye una colección de pruebas, documentación de ejecución, riesgos, guion de demo y preguntas de defensa.
-
-**Qué devolvió la IA:** README de raíz, colección Postman, guía de pruebas y defensa, y checklist relacionado con las ponderaciones de evaluación.
-
-**Qué corregí o rechacé:** _Completar después de usar la colección y contrastar cada criterio con evidencia real._
-
-## Prompt 7 — Rediseño visual con animaciones
-**Prompt usado:** Rediseña la interfaz existente de Grano & Hoja tomando como referencia visual la presentación forestal adjunta: verdes profundos, tonos crema, contraste editorial y motivos botánicos. Añade animaciones modernas, transiciones cuidadas y adaptación móvil, sin modificar las reglas de negocio ni agregar librerías de interfaz.
-
-**Qué devolvió la IA:** nueva navegación lateral adaptable, barra superior translúcida, cabeceras verde bosque con ilustración SVG, tarjetas con profundidad, estados hover y animaciones de entrada, junto con soporte para `prefers-reduced-motion`.
-
-**Qué corregí o rechacé:** _Completar después de abrir la interfaz en navegador en escritorio y móvil; ajustar lo que no sea cómodo para caja._
+**Qué corregí o rechacé:**
 
 
-## Prompt 7 — Auditoría de seguridad y login (Fase 1)
+## 2. Autenticación y secretos
 
-**Prompt usado:** Revisar Grano & Hoja y diagnosticar medidas de seguridad faltantes; implementar únicamente configuración, secretos y autenticación, añadir login visual con la misma temática y varios usuarios, y detenerse antes de la Fase 2.
+**Prompt usado:** Audita la aplicación, crea un login con la misma estética y aplica autenticación segura con hashes, sesiones persistentes, bloqueo de login y secretos por variables de entorno; trabaja por fases.
 
-**Qué devolvió la IA:** diagnóstico de rutas públicas y ausencia de autenticación; cookie de sesión HttpOnly/SameSite, sesiones persistidas en PostgreSQL, hashing bcrypt, rate limiting, bloqueo temporal, flujo login/logout, tres roles aprovisionados a partir de contraseñas locales y rediseño adaptable de navegación/login.
+**Qué devolvió la IA:** login React, sesiones server-side PostgreSQL, hashes bcrypt, cookie HttpOnly/SameSite, seed de cuentas por `.env` y documentación de seguridad.
 
-**Qué corregí o rechacé:** _Completar después de revisar y probar el código._
+**Qué corregí o rechacé:**
+
+
+## 3. Control de acceso y validación
+
+**Prompt usado:** Implementa permisos por rol en el backend, validación de cuerpos, IDs y filtros con Zod y protege el acceso al asistente de n8n, sin adelantar otras fases de seguridad.
+
+**Qué devolvió la IA:** middleware de roles, validadores estrictos, pruebas de esquemas y un proxy autenticado que mantiene los tokens de n8n en el servidor.
+
+**Qué corregí o rechacé:**
+
+
+## 4. Cambio de marca y modelo de negocio
+
+**Prompt usado:** Transformar el proyecto Grano & Hoja en Raíz & Madera, una tienda de plantas, muebles y decoración; conservar el logo botánico aprobado, la paleta verde bosque/crema, las animaciones y las medidas de seguridad; adaptar el modelo de negocio y entregar ZIP.
+
+**Qué devolvió la IA:** nuevo esquema de productos con categoría, precio y stock; ventas con detalle histórico, descuentos de existencias al confirmar, devolución del stock al anular dentro del plazo, panel de ventas, reportes de reposición y actualización de textos e interfaz.
+
+**Qué corregí o rechacé:**
+
+
+## 5. Adaptación del modelo PostgreSQL
+
+**Prompt usado:** Sustituir el esquema de receta e insumos de cafetería por inventario unitario de plantas, muebles y decoración, manteniendo usuarios, sesiones, productos, pedidos, líneas históricas, restricciones e índices.
+
+**Qué devolvió la IA:** `schema.sql` con cuentas internas, sesiones, catálogo, pedidos y `pedido_items`; artículos de muestra de las tres categorías y ventas de ejemplo de la última semana.
+
+**Qué corregí o rechacé:**
+
+
+## 6. Reglas transaccionales de inventario
+
+**Prompt usado:** Al confirmar una venta, agrupar cantidades por producto, bloquear productos en orden de ID con `SELECT ... FOR UPDATE`, validar stock suficiente, descontar dentro de `BEGIN/COMMIT/ROLLBACK`; al anular dentro de 15 minutos, devolver cantidades en una transacción.
+
+**Qué devolvió la IA:** servicio de pedidos con bloqueos de fila, errores `409` ante stock insuficiente/transición inválida/anulación vencida y preservación del precio al momento de la venta.
+
+**Qué corregí o rechacé:**
+
+
+## 7. Asistente de reposición n8n
+
+**Prompt usado:** Crear un agente de reposición para una tienda de plantas, muebles y decoración. Debe consultar stock inferior al mínimo y ventas de los últimos siete días, emitir JSON estricto `{ ok, data, error }` y no modificar inventario.
+
+**Qué devolvió la IA:** workflow exportable sin credenciales, herramientas HTTP de lectura y sugerencias justificadas por stock actual, mínimo y movimiento de ventas. La API actúa como proxy autenticado.
+
+**Qué corregí o rechacé:**
+
+
+## 8. Pruebas y documentación final
+
+**Prompt usado:** Actualiza README, colección Postman, pruebas de validación, arquitectura, decisiones de esquema y documentación de seguridad para la nueva marca, diferenciando verificaciones estáticas de pruebas de ejecución reales.
+
+**Qué devolvió la IA:** documentación, una colección Postman de flujo feliz y checklist de pruebas manuales. Se indica que el proyecto debe probarse con PostgreSQL/n8n reales antes de producción.
+
+**Qué corregí o rechacé:**
+
+## 9. Revisión final de inventario y pruebas de colección
+
+**Prompt usado:** Actualiza la colección Postman para el modelo de tienda de plantas, muebles y decoración y muestra todo el inventario en la vista Inventario con alerta por debajo del mínimo.
+
+**Qué devolvió la IA:** colección Postman nueva con login por rol, catálogo, reportes, CRUD, venta disponible, doble confirmación 409, venta sin stock 409 y logout; la vista Inventario ahora lista todos los artículos y marca los que están por debajo del mínimo.
+
+**Qué corregí o rechacé:**
+
+
+
+## Prompt: Registro de usuario e inicio de sesión con Google
+
+**Prompt usado:** Añadir al login una opción para crear un nuevo usuario y pedir autenticación con Gmail/Google, manteniendo el diseño botánico y las medidas de seguridad.
+
+**Qué devolvió la IA:** Botones de iniciar sesión y crear cuenta mediante Google OAuth 2.0; callback backend con state, nonce y PKCE S256; verificación del ID token y del correo; cuenta nueva con rol inicial `caja`; migración de PostgreSQL y pasos de configuración en Google Cloud Console.
+
+**Qué corregí o rechacé:**
+
+- ________________________________________________________________

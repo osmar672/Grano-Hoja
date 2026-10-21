@@ -1,14 +1,15 @@
 {
-  "name": "grano-hoja-api",
+  "name": "raiz-madera-api",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "API REST para el punto de venta e inventario de Grano & Hoja",
+  "description": "API REST para inventario y ventas de Raíz & Madera",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "check": "node --check src/server.js",
-    "users:seed": "node scripts/seed-users.js"
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/controllers/google-auth.controller.js && node --check src/routes/auth.routes.js && node --check src/services/auth.service.js",
+    "users:seed": "node scripts/seed-users.js",
+    "test": "node --test"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -18,7 +19,9 @@
     "bcrypt": "^6.0.0",
     "connect-pg-simple": "^10.0.0",
     "express-rate-limit": "^8.7.1",
-    "express-session": "^1.19.0"
+    "express-session": "^1.19.0",
+    "zod": "^4.6.7",
+    "google-auth-library": "^11.3.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

@@ -1,0 +1,350 @@
+{
+  "name": "Raíz & Madera - Asistente de reposición",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "raiz-madera/asistente-compras",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "id": "gh-webhook-001",
+      "name": "Webhook compras",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "c8f4a8b7-8d65-4a1f-91d3-8e2a9d60f1a1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json;\nconst solicitud = typeof body.solicitud === 'string' ? body.solicitud.trim() : '';\nif (!solicitud || solicitud.length > 2000) {\n  const error = !solicitud ? 'El campo solicitud es obligatorio.' : 'La solicitud no puede superar los 2000 caracteres.';\n  return [{ json: { valid: false, error, ok: false, data: null } }];\n}\nreturn [{ json: { valid: true, solicitud } }];"
+      },
+      "id": "gh-validate-002",
+      "name": "Validar entrada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "gh-if-condition",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "gh-if-003",
+      "name": "¿Entrada válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.solicitud }}",
+        "options": {
+          "systemMessage": "Eres el asistente de reposición de Raíz & Madera, una tienda de plantas, muebles y decoración en Costa Rica. Basa todas tus recomendaciones exclusivamente en los datos reales devueltos por las herramientas de la API; nunca inventes stock, mínimos, unidades vendidas ni precios. Utiliza ambas herramientas: Productos por debajo del mínimo y Reporte de ventas de los últimos 7 días. Para cada producto, compara stock actual, stock_minimo y unidades_vendidas_7_dias. Recomienda una cantidad de reposición razonable, no negativa, priorizando los faltantes y productos con movimiento semanal. Devuelve SOLO JSON válido, sin markdown ni texto fuera del JSON, con esta forma exacta: {\"resumen\":\"resumen breve en español\",\"sugerencias\":[{\"producto\":\"nombre exacto del producto\",\"cantidad_sugerida\":0,\"justificacion\":\"menciona stock actual, mínimo y unidades vendidas en los últimos 7 días\"}]}. Si ningún artículo necesita reposición, usa una lista vacía. No generes órdenes de compra ni modifiques el inventario. Si una herramienta falla, explica la limitación en resumen y no inventes cifras."
+        }
+      },
+      "id": "gh-agent-004",
+      "name": "AI Agent - compras",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        260
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "id": "gh-model-005",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        650,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Consulta productos activos cuyo stock actual está por debajo de stock_minimo, con la cantidad faltante.",
+        "method": "GET",
+        "url": "http://host.docker.internal:3001/api/reportes/productos-bajo-stock",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        }
+      },
+      "id": "gh-tool-low-006",
+      "name": "Productos bajo mínimo",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        890,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Consulta unidades vendidas por producto, stock actual, mínimo y cantidad sugerida para una posible reposición durante los últimos siete días.",
+        "method": "GET",
+        "url": "http://host.docker.internal:3001/api/reportes/ventas-semana",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        }
+      },
+      "id": "gh-tool-sales-007",
+      "name": "Ventas últimos 7 días",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        1100,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $json.output ?? $json.text ?? $json.response ?? '';\nif (typeof raw !== 'string') raw = JSON.stringify(raw);\nraw = raw.trim().replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```$/, '');\nlet data;\ntry { data = JSON.parse(raw); } catch {\n  return [{ json: { ok: false, data: null, error: 'El agente no devolvió JSON válido. Revisa la ejecución del workflow.' } }];\n}\nif (!data || typeof data !== 'object' || !Array.isArray(data.sugerencias) || typeof data.resumen !== 'string') {\n  return [{ json: { ok: false, data: null, error: 'La salida del agente no cumple el esquema resumen/sugerencias.' } }];\n}\nreturn [{ json: { ok: true, data, error: null } }];"
+      },
+      "id": "gh-success-008",
+      "name": "Normalizar respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        950,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: false, data: null, error: $json.error || 'La entrada no es válida.' } }];"
+      },
+      "id": "gh-input-error-009",
+      "name": "Respuesta de validación",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.error?.message || $json.message || 'No se pudo generar la sugerencia de reposición.';\nreturn [{ json: { ok: false, data: null, error: String(raw) } }];"
+      },
+      "id": "gh-agent-error-010",
+      "name": "Respuesta de error del agente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        950,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": "={{ $json.ok ? 200 : 400 }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "gh-response-011",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1240,
+        450
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook compras": {
+      "main": [
+        [
+          {
+            "node": "Validar entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar entrada": {
+      "main": [
+        [
+          {
+            "node": "¿Entrada válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Entrada válida?": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - compras",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta de validación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - compras": {
+      "main": [
+        [
+          {
+            "node": "Normalizar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta de error del agente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - compras",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar respuesta": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta de validación": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta de error del agente": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Productos bajo mínimo": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent - compras",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ventas últimos 7 días": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent - compras",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4e8b2f15-14d2-4d5b-a0b2-9bc756fc3f48",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "tags": []
+}

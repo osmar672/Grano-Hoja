@@ -4,12 +4,11 @@ import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import { pool } from './db.js';
 import { authRouter } from './routes/auth.routes.js';
-import { requireAuth } from './middleware/requireAuth.js';
-import { insumosRouter } from './routes/insumos.routes.js';
 import { productosRouter } from './routes/productos.routes.js';
 import { pedidosRouter } from './routes/pedidos.routes.js';
 import { resumenRouter } from './routes/resumen.routes.js';
 import { reportesRouter } from './routes/reportes.routes.js';
+import { agenteRouter } from './routes/agente.routes.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 const sessionSecret = process.env.SESSION_SECRET;
@@ -45,7 +44,7 @@ app.use(express.json({ limit: '1mb' }));
 
 const PgSessionStore = connectPgSimple(session);
 app.use(session({
-  name: process.env.SESSION_COOKIE_NAME || 'gh.sid',
+  name: process.env.SESSION_COOKIE_NAME || 'rm.sid',
   secret: sessionSecret,
   store: new PgSessionStore({
     pool,
@@ -60,21 +59,21 @@ app.use(session({
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge: sessionMinutes * 60 * 1000,
     path: '/',
   },
 }));
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, message: 'API Grano & Hoja activa' }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, message: 'API Raíz & Madera activa' }));
 app.use('/api/auth', authRouter);
 
-// Los recursos de negocio ya requieren una sesión válida. La autorización por rol se completa en Fase 2.
-app.use('/api/insumos', requireAuth, insumosRouter);
-app.use('/api/productos', requireAuth, productosRouter);
-app.use('/api/pedidos', requireAuth, pedidosRouter);
-app.use('/api/resumen', requireAuth, resumenRouter);
-app.use('/api/reportes', requireAuth, reportesRouter);
+// Cada router aplica autenticación, permisos por rol y validación según el método y recurso.
+app.use('/api/productos', productosRouter);
+app.use('/api/pedidos', pedidosRouter);
+app.use('/api/resumen', resumenRouter);
+app.use('/api/reportes', reportesRouter);
+app.use('/api/agente', agenteRouter);
 
 app.use(notFound);
 app.use(errorHandler);

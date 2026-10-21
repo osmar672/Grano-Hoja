@@ -693,7 +693,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 }
 
 
-/* FASE 1 · Login privado con la identidad botánica de Grano & Hoja. */
+/* FASE 1 · Login privado con la identidad botánica de Raíz & Madera. */
 .login-screen {
   --login-forest: #10291e;
   --login-forest-mid: #173c29;
@@ -834,3 +834,87 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   .login-backdrop span, .login-leaf, .auth-spinner { animation: none !important; }
 }
+
+/* Fase 2: pantalla de rechazo de acceso por rol; mantiene la identidad botánica. */
+.access-denied {
+  width: min(100% - 2rem, 680px);
+  margin: clamp(2rem, 8vh, 6rem) auto;
+  padding: clamp(1.5rem, 5vw, 3rem);
+  border: 1px solid rgba(107, 132, 96, 0.24);
+  border-radius: 1.5rem;
+  background: var(--surface, #fffdf5);
+  box-shadow: 0 24px 80px rgba(12, 36, 24, 0.12);
+}
+.access-denied h1 { margin-block: 0.5rem; }
+.access-denied p { color: var(--text-muted, #647568); line-height: 1.7; }
+
+/* Raíz & Madera: firma botánica y jerarquía visual para la tienda. */
+.brand-mark { overflow: hidden; color: #cbdcb8; padding: 3px; }
+.brand-mark svg { width: 100%; height: 100%; display: block; }
+.sidebar-note-icon { overflow: hidden; width: 42px; height: 42px; display: grid; place-items: center; flex: 0 0 42px; }
+.sidebar-note-icon svg { width: 100%; height: 100%; color: #c1d7ac; }
+.login-brand-mark { display: grid; place-items: center; overflow: hidden; }
+.login-brand-mark svg { width: 100%; height: 100%; display: block; color: #d8e7c4; }
+.login-mobile-brand .login-brand-mark { overflow: hidden; }
+.login-mobile-brand .login-brand-mark svg { color: #426b50; }
+.login-leaf { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; }
+.login-leaf svg { width: 100%; height: 100%; color: #c9ddb4; }
+.botanical-hero { position: relative; overflow: hidden; min-height: 190px; padding: clamp(22px, 4vw, 36px); border: 1px solid #dbe4d4; border-radius: 22px; background: radial-gradient(circle at 85% 10%, rgba(183,207,156,.34), transparent 27%), linear-gradient(118deg, #f3f4e9, #fbf8ee 65%, #e8efe1); }
+.botanical-hero::before, .botanical-hero::after { content: ""; position: absolute; pointer-events: none; border: 1px solid rgba(78,112,72,.14); border-radius: 50%; transform: rotate(-27deg); }
+.botanical-hero::before { width: 330px; height: 420px; right: -65px; top: -125px; }
+.botanical-hero::after { width: 240px; height: 330px; right: -17px; top: -80px; }
+.botanical-hero > div:first-child { position: relative; z-index: 1; max-width: 720px; }
+.botanical-hero h1 { max-width: 690px; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
+.hero-botanical-mark { position: absolute; z-index: 0; right: clamp(30px, 6vw, 75px); top: 50%; width: clamp(95px, 13vw, 158px); aspect-ratio: 1; transform: translateY(-50%) rotate(-5deg); color: #456d4b; opacity: .9; animation: root-mark-float 7s ease-in-out infinite alternate; }
+.hero-botanical-mark svg { width: 100%; height: 100%; }
+@keyframes root-mark-float { from { transform: translateY(-48%) rotate(-8deg); } to { transform: translateY(-54%) rotate(3deg); } }
+.category-plantas { background: #e3eddb !important; color: #426b50 !important; }
+.category-muebles { background: #efe4d4 !important; color: #79583c !important; }
+.category-decoracion { background: #e8e8d9 !important; color: #777344 !important; }
+.detail-description { color: #657263; font-size: 13px; line-height: 1.8; margin: 0 0 18px; }
+.product-stats-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-top: 19px; }
+.product-stats-grid > div { display: flex; flex-direction: column; gap: 5px; padding: 15px; border: 1px solid #e9eadf; border-radius: 12px; background: #fbfaf5; }
+.product-stats-grid small { color: #879184; font-size: 10px; }
+.product-stats-grid strong { color: #27422e; font: 500 25px/1.1 Georgia,serif; }
+.product-stats-grid span { color: #92998e; font-size: 9px; }
+.stock-inline-alert { padding: 12px 14px; margin: 14px 0 0; border-radius: 10px; background: #fbf1d9; color: #946821; font-size: 11px; }
+.pos-product-initial { width: 39px; height: 39px; border-radius: 13px 13px 13px 4px; }
+.product-row { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.product-row:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(29,58,38,.06); }
+.nav-link { transition: transform .22s cubic-bezier(.2,.8,.2,1), background .2s, color .2s; }
+.nav-link:hover { transform: translateX(3px); }
+.panel-card, .metric-card, .entity-row, .order-card { animation: rm-rise-in .48s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes rm-rise-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.main-nav.nav-count-4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+@media (max-width: 900px) { .main-nav.nav-count-4 { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+@media (max-width: 680px) {
+  .hero-botanical-mark { width: 64px; right: 20px; top: 18px; transform: none; opacity: .42; }
+  .botanical-hero { min-height: 0; padding: 22px 18px; }
+  .botanical-hero::before { right: -190px; }
+  .botanical-hero::after { right: -145px; }
+  .botanical-hero h1 { max-width: 85%; font-size: clamp(30px, 8vw, 38px); }
+  .product-stats-grid { grid-template-columns: 1fr; }
+  .product-stats-grid > div { display: grid; grid-template-columns: 1fr auto; align-items: center; }
+  .product-stats-grid > div span { grid-column: 1 / -1; }
+  .login-story-copy p { display: block; max-width: 390px; margin-bottom: 0; }
+  .login-story { min-height: 245px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+.stock-warning-pill { display: inline-flex; width: fit-content; margin-top: 7px; font-size: 9px; }
+
+
+/* Autenticación Google: conserva la paleta botánica y el foco accesible. */
+.login-auth-divider { display: flex; align-items: center; gap: 12px; margin: 20px 0 13px; color: #8a9685; font-size: 8px; font-weight: 850; letter-spacing: .13em; }
+.login-auth-divider::before, .login-auth-divider::after { content: ""; height: 1px; flex: 1; background: #e1e7da; }
+.google-auth-button { display: flex; align-items: center; justify-content: center; gap: 11px; width: 100%; min-height: 49px; padding: 0 15px; border: 1px solid #d9e2d3; border-radius: 13px; background: rgba(255,255,251,.9); color: #294632; font-size: 11px; font-weight: 800; box-shadow: 0 4px 12px rgba(31,63,40,.04); transition: transform .2s, border-color .2s, box-shadow .2s, background .2s; }
+.google-auth-button:hover { transform: translateY(-2px); border-color: #a9c29a; background: #fff; box-shadow: 0 10px 22px rgba(31,63,40,.1); }
+.google-auth-button:focus-visible, .login-register-prompt a:focus-visible { outline: 3px solid rgba(104,145,88,.38); outline-offset: 3px; }
+.google-auth-icon { width: 18px; height: 18px; flex: 0 0 18px; }
+.login-register-prompt { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 16px; color: #788675; font-size: 10px; }
+.login-register-prompt a { color: #315a3b; font-weight: 850; text-decoration: underline; text-decoration-color: #a9c59a; text-underline-offset: 3px; }
+.login-register-prompt a:hover { color: #173b27; text-decoration-color: #527c4b; }
+@media (prefers-reduced-motion: reduce) { .google-auth-button { transition: none; } .google-auth-button:hover { transform: none; } }

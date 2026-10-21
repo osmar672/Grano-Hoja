@@ -1,24 +1,28 @@
-# Estado de validación técnica
+# Estado de validación — Raíz & Madera
 
-Fecha de preparación: 21 de octubre de 2026.
+## Revisiones realizadas al preparar este ZIP
 
-## Comprobaciones realizadas durante la generación
+- Se revisó el esquema SQL, las rutas de API y los servicios de inventario/ventas respecto al nuevo dominio.
+- Se incluyó un test de esquemas para categorías, existencias, IDs, login, pagos, validación anti-HTML y autorización por rol.
+- Se comprobaron estructuralmente los JSON del workflow y la colección Postman durante la generación del ZIP.
+- La interfaz React quedó adaptada al catálogo de plantas, muebles y decoración; se revisaron imports relativos y sintaxis JSX/JS con un parser estático.
 
-- `node --check` para los archivos JavaScript del backend: sin errores de sintaxis.
-- Parseo de los archivos `.js` y `.jsx` del frontend con el transpiler de TypeScript: 25 archivos, 0 diagnósticos.
-- Resolución de importaciones relativas del frontend: 68 importaciones comprobadas, sin archivos ausentes.
-- JSON: `n8n/workflow_grano_hoja.json` y `tests/Grano-Hoja.postman_collection.json` se pueden analizar.
-- Workflow n8n: 11 nodos; las conexiones principales apuntan a nodos existentes; el JSON no incorpora objetos de credenciales.
-- `schema.sql`: define las cinco tablas esperadas y contiene datos de muestra para diez insumos, ocho productos, recetas y quince pedidos. Se revisó que subtotal + impuesto coincida con total en los quince pedidos sembrados.
+## Pendiente de verificación en tu computadora
 
-## Comprobaciones que deben ejecutarse en el entorno del estudiante
+- `npm install`, `npm test`, `npm run check` y `npm run build` con dependencias reales.
+- Arranque de PostgreSQL, carga de `schema.sql`, sesiones y seed de usuarios.
+- Casos transaccionales simultáneos, stock insuficiente y anulación a los 16 minutos.
+- Importación/ejecución real del workflow con credencial propia de modelo y n8n accesible desde la API.
+- `npm audit`, OWASP ZAP y comprobación de HTTPS/cabeceras al desplegar.
 
-En el entorno de generación no estaban disponibles `psql` ni Docker, y la instalación de dependencias no terminó dentro del tiempo disponible. Por eso no se afirma que se haya ejecutado una prueba integral contra PostgreSQL ni que Vite haya construido la aplicación en este entorno. Antes de entregar:
+Esta documentación no declara una prueba como pasada si no se ejecutó en un entorno funcional.
 
-1. Carga `schema.sql` en PostgreSQL siguiendo el README.
-2. Instala dependencias por separado en `backend/` y `frontend/`.
-3. Ejecuta la colección `tests/Grano-Hoja.postman_collection.json` y guarda evidencia de los resultados.
-4. En el navegador, recorre los CRUD y los casos de error 400/404/409.
-5. Importa el workflow en tu versión de n8n, asigna la credencial del modelo, configura las URL de las herramientas y verifica el webhook con `curl`.
 
-La estructura del proyecto está preparada para estas comprobaciones, pero la evidencia final debe proceder de las pruebas que ejecutes localmente.
+## Actualización: login y registro con Google
+
+- [x] Se añadió flujo OAuth del lado del servidor con `state`, `nonce`, PKCE S256 y verificación de correo/ID token.
+- [x] Se añadieron botones de Google para acceder y crear cuenta en `/login`.
+- [x] Registro nuevo se limita al rol `caja`.
+- [x] Variables de Google documentadas solo en backend `.env.example`.
+- [x] Migración 002 y soporte en `schema.sql` para identificadores Google.
+- [ ] Pendiente: configurar las credenciales OAuth reales en Google Cloud Console y probar el callback en el equipo local; esas credenciales no pueden generarse automáticamente.

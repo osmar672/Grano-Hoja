@@ -24,10 +24,10 @@ export async function requireAuth(req, res, next) {
     const user = result.rows[0];
     if (!user || !user.active) {
       await destroySession(req);
-      res.clearCookie(process.env.SESSION_COOKIE_NAME || 'gh.sid', {
+      res.clearCookie(process.env.SESSION_COOKIE_NAME || 'rm.sid', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         path: '/',
       });
       return res.status(401).json({ error: 'La sesión no es válida. Inicia sesión de nuevo' });

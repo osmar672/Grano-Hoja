@@ -21,6 +21,14 @@
     {
       "key": "pedidoId",
       "value": "16"
+    },
+    {
+      "key": "adminEmail",
+      "value": ""
+    },
+    {
+      "key": "adminPassword",
+      "value": ""
     }
   ],
   "item": [
@@ -40,6 +48,72 @@
           ]
         },
         "description": ""
+      }
+    },
+    {
+      "name": "Login admin (configura variables locales)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        },
+        "description": "Define adminEmail y adminPassword manualmente en tu entorno local de Postman. No guardes contraseñas reales en el repositorio."
+      }
+    },
+    {
+      "name": "Asistente de compras (solo admin/encargado)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"solicitud\": \"Analiza el stock bajo mínimo y el consumo de la última semana. Sugiere cantidades justificadas.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/agente/sugerencia-compra",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "agente",
+            "sugerencia-compra"
+          ]
+        },
+        "description": "Ejecuta primero Login admin o inicia sesión como encargado. Debe funcionar a través del proxy backend; no llames directamente el webhook privado desde el navegador."
       }
     },
     {

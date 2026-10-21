@@ -6,9 +6,8 @@
         "httpMethod": "POST",
         "path": "grano-hoja/asistente-compras",
         "responseMode": "responseNode",
-        "options": {
-          "allowedOrigins": "http://localhost:5173"
-        }
+        "authentication": "headerAuth",
+        "options": {}
       },
       "id": "gh-webhook-001",
       "name": "Webhook compras",
@@ -108,7 +107,13 @@
         "toolDescription": "Consulta insumos cuyo stock actual está por debajo de stock_minimo. Usa estos datos para identificar faltantes reales.",
         "method": "GET",
         "url": "http://host.docker.internal:3001/api/insumos/bajo-minimo",
-        "options": {}
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        }
       },
       "id": "gh-tool-low-006",
       "name": "Insumos bajo mínimo",
@@ -124,7 +129,13 @@
         "toolDescription": "Obtiene unidades vendidas por producto y consumo estimado de cada insumo en las ventas confirmadas de los últimos siete días.",
         "method": "GET",
         "url": "http://host.docker.internal:3001/api/reportes/ventas-semana",
-        "options": {}
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        }
       },
       "id": "gh-tool-sales-007",
       "name": "Reporte ventas 7 días",
