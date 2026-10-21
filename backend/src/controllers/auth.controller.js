@@ -1,0 +1,77 @@
+import {
+  getAccountByEmail,
+  normalizeEmail,
+  recordFailedLogin,
+  recordSuccessfulLogin,
+  toPublicUser,
+  verifyPassword,
+} from '../services/auth.service.js';
+
+const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'gh.sid';
+const INVALID_CREDENTIALS = 'Credenciales incorrectas o acceso temporalmente bloqueado';
+
+function regenerateSession(req) {
+  return new Promise((resolve, reject) => {
+    req.session.regenerate((error) => error ? reject(error) : resolve());
+  });
+}
+
+function saveSession(req) {
+  return new Promise((resolve, reject) => {
+    req.session.save((error) => error ? reject(error) : resolve());
+  });
+}
+
+export async function login(req, res, next) {
+  try {
+    const { email, password } = req.body ?? {};
+    if (typeof email !== 'string' || typeof password !== 'string' ||
+        !email.trim() || !password || email.length > 254 || password.length > 256 || Buffer.byteLength(password, 'utf8') > 72) {
+      return res.status(400).json({ error: 'El formato del correo o la contraseña no es válido' });
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'El formato del correo o la contraseña no es válido' });
+    }
+
+    const account = await getAccountByEmail(normalizedEmail);
+    const locked = account?.locked_until && new Date(account.locked_until).getTime() > Date.now();
+    const passwordMatches = await verifyPassword(password, account);
+
+    if (!account || !account.active || locked || !passwordMatches) {
+      if (account?.active && !locked && !passwordMatches) {
+        await recordFailedLogin(account.id);
+      }
+      return res.status(401).json({ error: INVALID_CREDENTIALS });
+    }
+
+    await recordSuccessfulLogin(account.id);
+    await regenerateSession(req); // Cambia el ID de sesión y evita session fixation.
+    const user = toPublicUser(account);
+    req.session.user = user;
+    await saveSession(req);
+
+    return res.status(200).json({ ok: true, user });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function me(req, res) {
+  return res.status(200).json({ ok: true, user: req.user });
+}
+
+export async function logout(req, res, next) {
+  if (!req.session) return res.status(204).end();
+  req.session.destroy((error) => {
+    if (error) return next(error);
+    res.clearCookie(SESSION_COOKIE_NAME, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    });
+    return res.status(204).end();
+  });
+}

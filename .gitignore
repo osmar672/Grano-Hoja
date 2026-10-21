@@ -9,3 +9,8 @@ dist/
 Thumbs.db
 *.log
 backend/.data/
+
+# Cookies y sesiones de pruebas: nunca versionarlas.
+cookies.txt
+*.cookies
+*.session

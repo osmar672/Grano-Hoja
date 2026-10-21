@@ -5,6 +5,7 @@ export async function apiRequest(path, options = {}) {
   try {
     response = await fetch(`${API_URL}${path.startsWith('/') ? path : `/${path}`}`, {
       ...options,
+      credentials: 'include', // La cookie de sesión es HttpOnly y la gestiona el navegador.
       headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers },
     });
   } catch (cause) {

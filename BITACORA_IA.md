@@ -50,3 +50,12 @@
 **Qué devolvió la IA:** nueva navegación lateral adaptable, barra superior translúcida, cabeceras verde bosque con ilustración SVG, tarjetas con profundidad, estados hover y animaciones de entrada, junto con soporte para `prefers-reduced-motion`.
 
 **Qué corregí o rechacé:** _Completar después de abrir la interfaz en navegador en escritorio y móvil; ajustar lo que no sea cómodo para caja._
+
+
+## Prompt 7 — Auditoría de seguridad y login (Fase 1)
+
+**Prompt usado:** Revisar Grano & Hoja y diagnosticar medidas de seguridad faltantes; implementar únicamente configuración, secretos y autenticación, añadir login visual con la misma temática y varios usuarios, y detenerse antes de la Fase 2.
+
+**Qué devolvió la IA:** diagnóstico de rutas públicas y ausencia de autenticación; cookie de sesión HttpOnly/SameSite, sesiones persistidas en PostgreSQL, hashing bcrypt, rate limiting, bloqueo temporal, flujo login/logout, tres roles aprovisionados a partir de contraseñas locales y rediseño adaptable de navegación/login.
+
+**Qué corregí o rechacé:** _Completar después de revisar y probar el código._

@@ -29,3 +29,11 @@ La interfaz toma como referencia la presentación forestal adjunta: verde bosque
 
 ## Alcance
 Este cambio es visual. No modifica la estructura de datos, las rutas de API, los cálculos, las transacciones ni las reglas de los pedidos. Las pruebas estáticas de CSS, JSX y SVG pasan; la prueba interactiva completa requiere ejecutar Vite en un entorno con las dependencias instaladas.
+
+
+## Ajuste solicitado después de la captura (Fase 1)
+
+- En pantallas de hasta 900 px, la navegación se transforma en una barra inferior de cinco opciones para evitar scrollbars verticales y horizontales dentro del menú.
+- Se añadió `/login` con fondo bosque, líneas botánicas animadas, tarjeta crema y controles de acceso claros.
+- El área privada muestra el nombre/rol de la cuenta y un botón de cierre de sesión que destruye la sesión en el servidor.
+- Se respetan las preferencias `prefers-reduced-motion`.

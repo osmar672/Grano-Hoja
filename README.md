@@ -64,18 +64,13 @@ cd backend
 npm install
 ```
 
-Copia `.env.example` como `.env` y ajusta `DATABASE_URL` a tu PostgreSQL. Ejemplo local:
+Copia `backend/.env.example` como `backend/.env`, conserva sus variables y ajusta `DATABASE_URL` a tu PostgreSQL. Genera `SESSION_SECRET` con el comando de la sección **Autenticación (Fase 1)**; el servidor no arranca deliberadamente si falta o es débil.
 
-```env
-PORT=3001
-DATABASE_URL=postgresql://postgres:TU_PASSWORD@localhost:5432/grano_hoja
-CORS_ORIGIN=http://localhost:5173
-TZ=America/Costa_Rica
-```
+Después de levantar la base de datos, aplica la migración si tu volumen ya existía, instala dependencias y crea las cuentas del equipo:
 
-Inicia el modo de desarrollo:
-
-```bash
+```powershell
+npm install
+npm run users:seed
 npm run dev
 ```
 
@@ -83,11 +78,10 @@ Comprueba la API:
 
 ```bash
 curl http://localhost:3001/api/health
-curl http://localhost:3001/api/productos
-curl http://localhost:3001/api/resumen
+curl -i http://localhost:3001/api/productos
 ```
 
-Respuesta de salud esperada: `200` y `{"ok":true,"message":"API Grano & Hoja activa"}`.
+La salud debe responder `200` y `{"ok":true,"message":"API Grano & Hoja activa"}`. El listado de productos sin cookie debe responder `401` porque los endpoints de negocio requieren sesión. Inicia sesión para probar el resto de endpoints.
 
 ## 3. Iniciar React
 
@@ -183,7 +177,10 @@ erDiagram
 | POST | `/api/pedidos/:id/anular` | Anula y, cuando corresponde, devuelve insumos |
 | GET | `/api/resumen?fecha=YYYY-MM-DD` | Cierre de caja por día local |
 | GET | `/api/reportes/ventas-semana` | Ventas y consumo estimado últimos 7 días |
-| GET | `/api/health` | Comprobación de salud |
+| POST | `/api/auth/login` | Iniciar sesión; limita intentos y crea cookie HttpOnly |
+| GET | `/api/auth/me` | Consultar el usuario autenticado |
+| POST | `/api/auth/logout` | Destruir la sesión server-side |
+| GET | `/api/health` | Comprobación de salud (pública) |
 
 Los errores se responden como `{ "error": "mensaje" }`. Los conflictos de stock, transición de estado o referencias se responden con `409`.
 
@@ -198,7 +195,7 @@ Los errores se responden como `{ "error": "mensaje" }`. Los conflictos de stock,
 
 ## Pruebas
 
-Importa `tests/Grano-Hoja.postman_collection.json` en Postman, configura `baseUrl` como `http://localhost:3001`, y ejecuta primero los GET. Para una prueba manual crítica, crea un pedido con una cantidad de frappés superior a sus porciones disponibles e intenta confirmar: se espera `409` con un mensaje de insumos insuficientes.
+Importa `tests/Grano-Hoja.postman_collection.json` en Postman y configura `baseUrl` como `http://localhost:3001`, `loginEmail` y `loginPassword` con una cuenta creada localmente. Ejecuta `Login` primero; Postman conserva la cookie para las siguientes peticiones. Para una prueba manual crítica, crea un pedido con una cantidad de frappés superior a sus porciones disponibles e intenta confirmar: se espera `409` con un mensaje de insumos insuficientes.
 
 Consulta `docs/PRUEBAS_Y_DEFENSA.md` para casos de 400/404/409, concurrencia, guion de demo y preguntas de defensa. No declares una prueba como aprobada hasta ejecutarla localmente.
 
@@ -214,3 +211,67 @@ Si ya creaste el repositorio remoto, añade el remoto y realiza `git push -u ori
 
 ## Rediseño visual
 La interfaz usa una dirección botánica inspirada en la presentación forestal: navegación en verde bosque, superficies crema, cabeceras ilustradas, tarjetas de métricas con profundidad y animaciones de entrada/hover. Es responsive y respeta `prefers-reduced-motion`. El diseño está descrito en [`docs/REDISENO_VISUAL.md`](docs/REDISENO_VISUAL.md).
+
+
+## Autenticación (Fase 1)
+
+La interfaz ahora tiene un login y las rutas de negocio de la API requieren una sesión server-side. No hay cuentas con contraseñas predeterminadas: las contraseñas de tres cuentas se definen localmente en `backend/.env`.
+
+### Configurar variables
+
+```powershell
+Copy-Item .env.example .env
+Copy-Item backend/.env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env
+```
+
+En `backend/.env`, usa la misma contraseña PostgreSQL configurada en `.env`, crea un `SESSION_SECRET` de al menos 32 bytes (recomendado, 48 bytes aleatorios) y define `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_PASSWORD` y `SEED_CASHIER_PASSWORD` con claves distintas.
+
+Genera un secreto en PowerShell:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+### Base existente: aplicar migración de usuarios
+
+Si PostgreSQL ya cargó `schema.sql` antes de añadir login, aplica esta migración una vez:
+
+```powershell
+Get-Content backend/migrations/001_auth.sql | docker compose exec -T db psql -U postgres -d grano_hoja
+```
+
+Si cambiaste `POSTGRES_USER` o `POSTGRES_DB`, sustituye `postgres` y `grano_hoja` por los valores configurados. En una base nueva la tabla `app_users` viene incluida en `schema.sql`.
+
+### Crear tres cuentas
+
+```powershell
+cd backend
+npm install
+npm run users:seed
+npm run dev
+```
+
+Se aprovisionan estas cuentas, con correo y rol configurables en `backend/.env`:
+
+- `SEED_ADMIN_EMAIL` — rol `admin`.
+- `SEED_MANAGER_EMAIL` — rol `encargado`.
+- `SEED_CASHIER_EMAIL` — rol `caja`.
+
+El script rechaza claves vacías, débiles o repetidas por cuenta. Si se vuelve a ejecutar, actualiza las claves y datos de las cuentas configuradas.
+
+En otra terminal:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Abre `http://localhost:5173`. Para el entorno local el backend usa `http://localhost:3001/api` y la cookie no lleva `Secure` porque HTTP local no es HTTPS. En producción, `NODE_ENV=production` activa `Secure`, pero necesitas configurar TLS real; sigue `SECURITY.md` antes de desplegar.
+
+### Importante: roles
+
+Esta fase guarda y muestra los roles, pero todavía no limita operaciones según el rol. La matriz de permisos del servidor y los controles contra IDOR corresponden a la Fase 2. No publiques la aplicación hasta completarla.
+
+Consulta [`SECURITY.md`](./SECURITY.md) y [`docs/SECURITY_AUDIT_PHASE1.md`](./docs/SECURITY_AUDIT_PHASE1.md) para el estado completo.

@@ -6,7 +6,7 @@ Fecha de preparación: 21 de octubre de 2026.
 
 - `node --check` para los archivos JavaScript del backend: sin errores de sintaxis.
 - Parseo de los archivos `.js` y `.jsx` del frontend con el transpiler de TypeScript: 25 archivos, 0 diagnósticos.
-- Resolución de importaciones relativas del frontend: 59 importaciones comprobadas, sin archivos ausentes.
+- Resolución de importaciones relativas del frontend: 68 importaciones comprobadas, sin archivos ausentes.
 - JSON: `n8n/workflow_grano_hoja.json` y `tests/Grano-Hoja.postman_collection.json` se pueden analizar.
 - Workflow n8n: 11 nodos; las conexiones principales apuntan a nodos existentes; el JSON no incorpora objetos de credenciales.
 - `schema.sql`: define las cinco tablas esperadas y contiene datos de muestra para diez insumos, ocho productos, recetas y quince pedidos. Se revisó que subtotal + impuesto coincida con total en los quince pedidos sembrados.
