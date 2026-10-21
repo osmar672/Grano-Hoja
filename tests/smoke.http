@@ -1,0 +1,22 @@
+@baseUrl = http://localhost:3001
+
+### Salud
+GET {{baseUrl}}/api/health
+
+### Menú con búsqueda, categoría y orden
+GET {{baseUrl}}/api/productos?q=latte&categoria=Bebidas%20calientes&orden=precio&direccion=desc
+
+### Insumos por debajo del mínimo
+GET {{baseUrl}}/api/insumos/bajo-minimo
+
+### Resumen diario
+GET {{baseUrl}}/api/resumen
+
+### Reporte de ventas de los últimos 7 días
+GET {{baseUrl}}/api/reportes/ventas-semana
+
+### Body inválido: debe responder 400 y { "error": "..." }
+POST {{baseUrl}}/api/insumos
+Content-Type: application/json
+
+{"nombre":"","unidad":"g","stock":-1,"stock_minimo":0}

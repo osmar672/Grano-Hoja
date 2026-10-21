@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import * as controller from '../controllers/productos.controller.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+export const productosRouter = Router();
+productosRouter.get('/', asyncHandler(controller.listar));
+productosRouter.post('/', asyncHandler(controller.crear));
+productosRouter.get('/:id', asyncHandler(controller.obtener));
+productosRouter.put('/:id', asyncHandler(controller.actualizar));
+productosRouter.patch('/:id', asyncHandler(controller.parchear));
+productosRouter.delete('/:id', asyncHandler(controller.eliminar));

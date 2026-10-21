@@ -1,28 +1,11 @@
-# Variables de entorno: nunca subir secretos
+node_modules/
 .env
 .env.*
 !.env.example
-
-# Dependencias Node.js
-node_modules/
-**/node_modules/
-
-# Builds y cobertura
-**/dist/
-**/dist-ssr/
-**/coverage/
-*.log
-npm-debug.log*
-yarn-debug.log*
-pnpm-debug.log*
-
-# Editores y sistema
-.vscode/
-.idea/
+coverage/
+dist/
+.vite/
 .DS_Store
 Thumbs.db
-
-# Dumps y copias de bases de datos
-*.dump
-*.sql.gz
-*.backup
+*.log
+backend/.data/

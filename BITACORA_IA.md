@@ -1,86 +1,45 @@
-# BITACORA_IA.md — Grano & Hoja
+# BITÁCORA DE USO DE IA — Grano & Hoja
 
-Este archivo registra decisiones y uso de IA para que pueda defenderse individualmente el proyecto. Después de cada fase, revisar la respuesta generada y completar el campo de correcciones.
+> Registro inicial de prompts utilizados para construir y revisar la solución. Antes de la defensa, agrega los resultados de tus pruebas reales y explica qué entiendes de cada bloque. El campo **Qué corregí o rechacé** debe reflejar tus decisiones, no copiarse sin revisar.
 
-## Registro 1 — Fase 1: planificación integrada de backend y frontend
+## Prompt 1 — Modelo de datos
+**Prompt usado:** Diseña un esquema PostgreSQL para una cafetería con insumos, productos, recetas, pedidos y pedido_items, relaciones, restricciones CHECK/NOT NULL y datos de ejemplo realistas. No implementes combos.
 
-### Prompt utilizado
+**Qué devolvió la IA:** `schema.sql` con cinco tablas, claves foráneas, índices, diez insumos, ocho productos, recetas y quince pedidos distribuidos en siete días.
 
-> Actúa como copiloto senior de backend (Node.js, Express, PostgreSQL) y frontend (React, React Router), con enfoque de mentor. Planifica el laboratorio de Grano & Hoja por fases. En esta fase entrega el entendimiento del caso, diagrama ER Mermaid, tabla de endpoints, reglas de negocio y códigos HTTP, decisiones sobre estados del pedido, plazo de 15 minutos, consumo agregado de insumos, tipos NUMERIC y redondeo, zona horaria, recursos CRUD y árbol de carpetas. Une esta planificación con la del frontend React y entrega un ZIP preparado para Git. No avances más allá de la Fase 1.
+**Qué corregí o rechacé:** _Completar después de revisar schema.sql y cargarlo en PostgreSQL._
 
-### Qué devolvió la IA
+## Prompt 2 — API segura por capas
+**Prompt usado:** Implementa una API Node.js/Express por rutas, controladores y servicios con PostgreSQL, consultas parametrizadas, validación, códigos 200/201/400/404/409, y errores `{ error }`.
 
-> La IA produjo un diseño compartido para API y frontend, una propuesta de endpoints REST con filtros y reportes, un diagrama ER de cinco tablas, reglas de transacción para confirmar/anular pedidos, decisiones sobre precisión decimal y zona horaria, rutas de React Router y un árbol de carpetas del monorepo. También documentó cómo comprobar conectividad/CORS y cómo inicializar Git.
+**Qué devolvió la IA:** backend con Pool, AppError, middleware central y CRUD para insumos/productos.
 
-### Qué corregí o rechacé
+**Qué corregí o rechacé:** _Completar tras ejecutar y probar endpoints._
 
+## Prompt 3 — Inventario y transacciones
+**Prompt usado:** Implementa confirmación y anulación de pedidos con BEGIN/COMMIT/ROLLBACK, SELECT FOR UPDATE ordenado por id, agregación de necesidades compartidas, 13% de impuesto y ventana de anulación de 15 minutos.
 
-## Registro 1B — Ajuste de planificación con la rúbrica adjunta
+**Qué devolvió la IA:** servicios transaccionales de pedido y consulta SQL para resumen diario y reporte semanal.
 
-### Prompt utilizado
+**Qué corregí o rechacé:** _Completar después de comprobar stock antes/después y los casos 409._
 
-> Aquí está la rúbrica; ajusta la versión para que se alinee con sus criterios de evaluación.
+## Prompt 4 — Frontend React
+**Prompt usado:** Crea un frontend React/Vite con React Router, capa services/api.js, hook useFetch, formularios controlados, estados loading/error/empty, CRUD, filtros, búsqueda, orden y tarjetas de métricas. Usa CSS propio sin librerías UI.
 
-### Qué devolvió la IA
+**Qué devolvió la IA:** vistas Panel, Productos, Detalle, Insumos, Pedidos, Nuevo pedido y Asistente, con componentes reutilizables y variables CSS de café/verde/crema.
 
-> Añadió una matriz que relaciona los seis criterios de la rúbrica con su peso, la evidencia exigida y el estado real del repositorio. Actualizó el README para aclarar que este ZIP es todavía una planificación, alineó `schema.sql` como archivo previsto en la raíz, y añadió planes para pruebas reproducibles y el workflow de n8n sin credenciales.
+**Qué corregí o rechacé:** _Completar después de ejecutar Vite y probar flujo por flujo._
 
-### Qué corregí o rechacé
+## Prompt 5 — Agente n8n
+**Prompt usado:** Genera un workflow n8n importable con Webhook POST, validación de entrada, AI Agent, modelo de chat, HTTP Request Tools para bajo mínimo y ventas semanales, Respond to Webhook y contrato `{ ok, data, error }`. No incluyas credenciales.
 
+**Qué devolvió la IA:** `n8n/workflow_grano_hoja.json` sin tokens ni IDs de credenciales; debe seleccionarse la credencial de modelo al importar y configurarse la URL de la API según el entorno.
 
+**Qué corregí o rechacé:** _Completar luego de importar, configurar, activar y probar con curl._
 
-## Registro 2 — Fase 2: base de datos
+## Prompt 6 — Alineación con rúbrica y pruebas
+**Prompt usado:** Revisa el proyecto frente a la rúbrica del Laboratorio #2 e incluye una colección de pruebas, documentación de ejecución, riesgos, guion de demo y preguntas de defensa.
 
-### Prompt utilizado
+**Qué devolvió la IA:** README de raíz, colección Postman, guía de pruebas y defensa, y checklist relacionado con las ponderaciones de evaluación.
 
-> Pendiente: pegar el prompt exacto usado para crear y probar `schema.sql` y los datos de ejemplo.
-
-### Qué devolvió la IA
-
-> Pendiente.
-
-### Qué corregí o rechacé
-
-
-
-## Registro 3 — Fase 3: API de lectura y alta
-
-### Prompt utilizado
-
-> Pendiente: pegar el prompt exacto usado para inicializar Express, conexión PostgreSQL, middleware, listados y altas.
-
-### Qué devolvió la IA
-
-> Pendiente.
-
-### Qué corregí o rechacé
-
-
-
-## Registro 4 — Fase 4: edición y baja
-
-### Prompt utilizado
-
-> Pendiente: pegar el prompt exacto usado para PUT/PATCH/DELETE, validación y errores de integridad.
-
-### Qué devolvió la IA
-
-> Pendiente.
-
-### Qué corregí o rechacé
-
-
-
-## Registro 5 — Fase 5: reglas de negocio
-
-### Prompt utilizado
-
-> Pendiente: pegar el prompt exacto usado para transacciones, inventario, anulaciones y reportes.
-
-### Qué devolvió la IA
-
-> Pendiente.
-
-### Qué corregí o rechacé
-
-
+**Qué corregí o rechacé:** _Completar después de usar la colección y contrastar cada criterio con evidencia real._

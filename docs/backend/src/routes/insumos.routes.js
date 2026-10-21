@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import * as controller from '../controllers/insumos.controller.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+export const insumosRouter = Router();
+insumosRouter.get('/bajo-minimo', asyncHandler(controller.bajoMinimo));
+insumosRouter.get('/', asyncHandler(controller.listar));
+insumosRouter.post('/', asyncHandler(controller.crear));
+insumosRouter.get('/:id', asyncHandler(controller.obtener));
+insumosRouter.put('/:id', asyncHandler(controller.actualizar));
+insumosRouter.patch('/:id', asyncHandler(controller.parchear));
+insumosRouter.delete('/:id', asyncHandler(controller.eliminar));
