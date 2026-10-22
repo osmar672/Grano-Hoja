@@ -1,158 +1,97 @@
-# Raíz & Madera
+# Grano & Hoja
 
-Tienda de plantas, muebles y decoración. Aplicación full-stack con React + Vite, API REST en Node.js/Express, MySQL 8.4, sesiones seguras, roles, Google OAuth y asistente de reposición con n8n.
+Punto de venta e inventario para una cafetería: catálogo de bebidas y repostería, insumos con unidades de medida, recetas por producto, pedidos, movimientos de consumo y reportes. La aplicación usa React/Vite, Node.js/Express, MySQL 8/InnoDB y un workflow opcional de n8n.
 
-> **Estado:** proyecto preparado para probar en local. Antes de producción debes ejecutar las pruebas localmente, revisar `npm audit`, configurar un dominio HTTPS, crear/rotar secretos reales y probar Google OAuth/n8n. No se afirma que servicios externos estén probados sin tus credenciales.
+> **Estado comprobado en esta sesión:** `backend/npm run check`, `backend/npm test` (39 pruebas), el verificador de Vercel (20/20) y los contratos estáticos de integración (33/33) pasan con los módulos presentes en el ZIP. La instalación limpia y el build completo no se pudieron verificar porque el entorno no resuelve `registry.npmjs.org`. No se pudo probar MySQL real, Google OAuth, Vercel ni n8n desde esta sesión.
 
-## Stack
-- `frontend/`: React, Vite, React Router y CSS propio; las solicitudes van a `/api`.
-- `backend/`: Express por capas, `mysql2/promise`, `express-session`, almacenamiento de sesiones en MySQL, bcrypt, Zod, Helmet, CORS de lista blanca y protección CSRF.
-- `schema.sql`: estructura MySQL 8.4 más datos demostrativos de productos y ventas.
-- `schema.production.sql`: estructura sin datos de demostración ni instrucciones DROP.
-- `n8n/workflow_raiz_madera.json`: agente de reposición; se importan credenciales dentro de n8n, nunca dentro del JSON.
-- `compose.yaml`: MySQL y n8n para desarrollo local. La API y React se ejecutan en terminales; n8n está en Docker.
-- `compose.production.yaml`: MySQL privada, API, frontend/Nginx y Caddy HTTPS. La instancia productiva de n8n se configura aparte (n8n cloud/servidor seguro) y se conecta por HTTPS.
+## Componentes
+
+- `frontend/`: React, Vite, React Router y CSS propio. Consume la API mediante `/api`.
+- `backend/`: Express ES modules, `mysql2/promise`, sesiones guardadas en MySQL, Zod, Helmet, limitación de intentos, roles, CSRF y Google OAuth.
+- `schema.sql`: esquema de desarrollo y datos de demostración de cafetería. **Es destructivo**: incluye `DROP TABLE`; úsalo solo para una base desechable.
+- `schema.production.sql`: esquema inicial de producción sin datos de demostración y sin instrucciones `DROP`.
+- `backend/migrations/004_insumos_recetas.sql`: migración aditiva de insumos, recetas y movimientos; se aplica después de las migraciones previas/esquema que corresponda.
+- `n8n/workflow_grano_hoja.json`: workflow oficial opcional para sugerencias de reposición, consulta de insumos bajos y reportes. No incluye credenciales.
+- `compose.yaml`: MySQL y n8n para desarrollo; API y frontend se inician desde sus carpetas.
+- `compose.production.yaml`: configuración alternativa contenerizada. La configuración de Vercel Services está en `vercel.json` y `docs/VERCEL_SERVICES.md`.
 
 ## Requisitos
-- Node.js 22.12+ y npm.
-- Docker Desktop / Docker Compose.
-- Cuenta/proyecto de Google Cloud OAuth si vas a probar inicio de sesión con Google.
-- Una credencial de modelo de chat (por ejemplo, OpenAI) para el agente de n8n.
 
-## Desarrollo en Windows (PowerShell)
+Node.js 22.12 o superior (el CI usa Node 24), npm, MySQL 8.0.16+ —recomendado 8.4— e InnoDB. Docker Compose facilita el MySQL local. Google Cloud OAuth y un proveedor de modelo de chat solo son necesarios si vas a probar esas integraciones.
 
-### 1. Configurar el entorno
+## Desarrollo en PowerShell
 
-Desde la raíz del repositorio, la forma sencilla es ejecutar el asistente de configuración. Genera secretos para MySQL/sesión/n8n, alinea las variables DB_* y te pide de forma oculta las contraseñas iniciales y un nuevo Google Client Secret si aún no está configurado:
+### 1. Configurar entorno local
+
+Desde la carpeta principal del proyecto:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\configurar-integracion-local.ps1
 ```
 
-El script escribe `.env` y `backend/.env`, que son locales y están excluidos de Git. No imprime los secretos. Si prefieres hacerlo a mano, copia `.env.example` a `.env` y `backend/.env.example` a `backend/.env`, y completa los campos vacíos. La contraseña `MYSQL_APP_PASSWORD` de la raíz debe ser **idéntica** a `DB_PASSWORD` de `backend/.env`. El script de creación del usuario exige una contraseña de al menos 32 caracteres alfanuméricos/guion/guion bajo. Genera claves distintas con:
-
-```powershell
-node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
-```
-
-Usa valores diferentes para `MYSQL_ROOT_PASSWORD`, `MYSQL_APP_PASSWORD`, `SESSION_SECRET`, `N8N_ENCRYPTION_KEY`, `N8N_WEBHOOK_AUTH_TOKEN` y `N8N_API_SERVICE_TOKEN`. No copies secretos de chats ni uses el antiguo Google Client Secret si ya fue compartido; rota el secreto en Google Cloud y guarda el nuevo solo en `backend/.env`.
+El asistente crea/actualiza `.env` y `backend/.env`; los secretos no se imprimen. Estos archivos reales están ignorados por Git y excluidos de los paquetes de distribución. Si prefieres hacerlo manualmente, copia `.env.example` a `.env` y `backend/.env.example` a `backend/.env`. Mantén `MYSQL_APP_PASSWORD` y `DB_PASSWORD` sincronizadas, y usa valores distintos para `MYSQL_ROOT_PASSWORD`, `MYSQL_APP_PASSWORD`, `SESSION_SECRET`, `N8N_ENCRYPTION_KEY`, `N8N_WEBHOOK_AUTH_TOKEN` y `N8N_API_SERVICE_TOKEN`.
 
 ### 2. Iniciar MySQL y n8n
 
 ```powershell
 docker compose up -d db n8n
+docker compose ps
 ```
 
-El primer arranque de un volumen MySQL nuevo ejecuta `schema.sql` y carga los datos demostrativos. Si ya existe el volumen, el contenedor **no** vuelve a ejecutar el esquema. Para reiniciar una base de demostración descartable desde cero, solo si aceptas perder todos sus datos:
+En un volumen MySQL nuevo, Docker ejecuta `schema.sql` y carga datos demo. Si el volumen ya existe, los scripts de inicialización no se repiten. Los identificadores antiguos de volúmenes Docker se conservaron intencionalmente para volver a conectar datos existentes; **no los renombres sin planificar la migración de volúmenes**. No uses `docker compose down -v` si hay datos que deban conservarse.
+
+### 3. Instalar y comprobar backend
 
 ```powershell
-docker compose down
-# ADVERTENCIA: elimina datos si también agregas -v. No uses -v si hay ventas que conservar.
-docker compose up -d db n8n
-```
-
-La base está enlazada solamente a `127.0.0.1:3306`; no la expongas a Internet.
-
-### 3. Instalar e iniciar la API
-
-```powershell
-cd backend
-npm install
+Push-Location backend
+npm install --no-fund --no-audit
 npm run check
-npm test
-npm run users:seed
-npm run dev
-```
-
-`npm run users:seed` necesita las tres contraseñas seguras definidas en `backend/.env`. Este script crea/actualiza usuarios de muestra `admin`, `encargado` y `caja`. No uses esas cuentas de ejemplo en producción.
-
-API: `http://localhost:3001/api/health` y `http://localhost:3001/api/ready`.
-
-### 4. Iniciar React
-
-Abre una terminal nueva, desde la raíz:
-
-```powershell
-cd frontend
-npm install
-npm run build
-npm run dev
-```
-
-Abre `http://localhost:5173`. El frontend utiliza `/api` y Vite proxy al backend en `http://127.0.0.1:3001`. No configures una URL localhost pública para producción.
-
-## Conectar n8n con la página
-
-Sigue el paso-a-paso completo en [`docs/MYSQL_N8N_SETUP.md`](docs/MYSQL_N8N_SETUP.md). Resumen:
-1. Abre `http://localhost:5678`, termina el onboarding de n8n.
-2. Importa `n8n/workflow_raiz_madera.json`.
-3. Crea una credencial **Header Auth** para el nodo Webhook: header `x-rm-webhook-token`, valor exactamente igual a `N8N_WEBHOOK_AUTH_TOKEN` del backend.
-4. Crea otra credencial **Header Auth** para los nodos HTTP Request Tool: header `x-service-token`, valor igual a `N8N_API_SERVICE_TOKEN` del backend. Asigna esa credencial a ambas herramientas.
-5. Asigna una credencial válida al nodo **OpenAI Chat Model** (el workflow exportado no incluye credenciales).
-6. Activa el workflow y comprueba que su ruta sea `/webhook/raiz-madera/asistente-compras`.
-7. React llama a `POST /api/agente/sugerencia-compra`; Express valida sesión/rol, llama al webhook con el token privado y devuelve `{ ok, data, error }`. n8n consulta los reportes a través de endpoints protegidos de Express; no conecta directamente a MySQL.
-
-## Conectar Google OAuth
-
-Consulta [`docs/GOOGLE_OAUTH_SETUP.md`](docs/GOOGLE_OAUTH_SETUP.md). En Google Cloud Console, para desarrollo local configura:
-- Origen autorizado: `http://localhost:5173`
-- URI de redireccionamiento: `http://localhost:3001/api/auth/google/callback`
-
-Completa `GOOGLE_CLIENT_ID` y el nuevo `GOOGLE_CLIENT_SECRET` en `backend/.env`. Si la pantalla OAuth está en modo de prueba, añade tu cuenta en la lista de usuarios de prueba. Nunca coloques el secreto en variables `VITE_` ni en Git.
-
-## Base de datos MySQL
-
-Conexión local desde MySQL Workbench: host `127.0.0.1`, puerto `3306`, base `raiz_madera`, usuario `raiz_app`; contraseña igual a `MYSQL_APP_PASSWORD`/`DB_PASSWORD`. También puedes usar:
-
-```powershell
-docker compose exec db mysql -u raiz_app -p raiz_madera
-```
-
-Para instalar una **base nueva de producción**, el Compose ejecuta `schema.production.sql`, que no incluye pedidos/products de demo. No se debe ejecutar `schema.sql` sobre datos reales: contiene `DROP TABLE` y datos de ejemplo. Migrar desde una base PostgreSQL antigua requiere un proceso de exportación/importación separado; cambiar las variables de entorno no migra datos.
-
-## Pruebas, logs y despliegue
-
-```powershell
-cd backend
 npm run check:integration
 npm test
-npm run audit
-npm run outdated
-cd ../frontend
+npm audit --audit-level=moderate
+Pop-Location
+```
+
+Configura las variables de `backend/.env.example` en el `.env` real. Para iniciar la API, desde `backend/`: `npm run dev`. Endpoints de disponibilidad: `/api/health` y `/api/ready`.
+
+### 4. Instalar y ejecutar frontend
+
+```powershell
+Push-Location frontend
+npm install --no-fund --no-audit
+npm audit --audit-level=moderate
+$env:VITE_API_URL = '/api'
 npm run build
-npm run audit
+npm run dev
+Pop-Location
 ```
 
-Importa `tests/Raiz-y-Madera.postman_collection.json` en Postman para las pruebas API. Consulta `docs/RELEASE_CHECKLIST.md`, `docs/PRODUCCION.md` y `SECURITY.md` antes de publicar. Para producción necesitas dominio/DNS, secretos diferentes, OAuth autorizado en HTTPS, n8n accesible mediante HTTPS, backup cifrado probado y escaneos de seguridad. `compose.production.yaml` no expone MySQL en el host.
+Abre `http://localhost:5173`. En desarrollo Vite dirige `/api` al backend local. Las dependencias deben instalarse desde cada carpeta: no se configura un workspace npm en el nivel superior; cada paquete mantiene su propio `package-lock.json` para alinearse con el CI y la configuración de Vercel. Los lockfiles incluidos aún necesitan regenerarse con el registro npm accesible; véase `docs/ESTADO_DE_VALIDACION.md`.
 
-## Desplegar en Vercel Services
+## Modelo funcional
 
-Ejecuta `node scripts/check-vercel.mjs` para revisar la configuración y `node scripts/check-integration.mjs` para comprobar el cableado antes de publicar.
+- `insumos`: nombre único, unidad (`g`, `ml`, `unidad`, etc.), stock actual/mínimo y estado activo.
+- `recetas`: cantidad de cada insumo por unidad de producto; una combinación producto/insumo solo puede aparecer una vez.
+- `pedidos`: se crea pendiente. Al confirmar, el backend agrupa el consumo para todas las líneas, bloquea las filas de insumos en orden por ID, comprueba stock y, dentro de una transacción MySQL, descuenta el inventario, registra movimientos y confirma. Un faltante responde `409` y hace rollback.
+- Al anular un pedido confirmado dentro de los 15 minutos permitidos, se restituyen los consumos guardados en los movimientos originales, sin usar la receta actual ni devolver dos veces. Una segunda anulación se rechaza.
+- Los productos sin receta se pueden vender, pero no descuentan insumos ni el campo histórico `productos.stock`. Crea receta en cada producto cuyo consumo debe controlarse.
+- El campo de stock de producto anterior se conserva por compatibilidad de registros, pero **no representa la existencia de ingredientes**.
 
-Esta versión usa Vercel Services con `backend` y `frontend`: el rewrite `/api/*` dirige a Express, y el catch-all dirige las demás rutas a React. En Vercel selecciona **Framework Preset: Services** y root directory `./`. La guía vigente está en [`PUBLICAR_EN_VERCEL.md`](PUBLICAR_EN_VERCEL.md) y [`docs/VERCEL_SERVICES.md`](docs/VERCEL_SERVICES.md).
+## Google OAuth y n8n
 
-MySQL y n8n siguen siendo servicios externos, por eso requieren URL accesible, TLS y variables propias. No se declaran bindings internos en esta arquitectura: el navegador llama a `/api/*` por el rewrite público, Express llama a MySQL/n8n externos. No subas archivos `.env`.
+Consulta `docs/GOOGLE_OAUTH_SETUP.md` y `docs/MYSQL_N8N_SETUP.md`. Google necesita un Client ID/Secret y el callback exacto configurado en Google Cloud. n8n usa el webhook `/webhook/grano-hoja/asistente-compras`, una credencial Header Auth para `x-gh-webhook-token`, otra para `x-service-token` y credencial de modelo. Las credenciales se configuran directamente en n8n; no van en el JSON ni en variables `VITE_*`.
 
-## Carpetas principales
+## Verificadores y tests manuales
 
-```text
-backend/src/routes/          # rutas REST
-backend/src/controllers/     # entrada HTTP/respuestas
-backend/src/services/        # lógica de negocio/SQL parametrizado
-backend/src/middleware/      # sesiones, roles, CSRF, validación, logs
-backend/src/db.js            # pool mysql2/promise
-frontend/src/pages/           # pantallas React
-frontend/src/components/      # componentes compartidos
-frontend/src/services/api.js  # única capa de solicitudes a API
-n8n/workflow_raiz_madera.json # agente de reposición
-schema.sql                    # esquema de desarrollo + seed
-schema.production.sql         # esquema inicial sin datos demo
+```powershell
+node scripts/check-vercel.mjs
+node scripts/check-integration.mjs
 ```
 
-## Licencia y datos
+Los tests puros de consumo no requieren MySQL. Las pruebas de migración, bloqueos `FOR UPDATE`, concurrencia, confirmación/anulación y movimientos deben correr con MySQL real; están documentadas en `tests/README.md` y `tests/smoke.http`. Las ejecuciones de Vercel, OAuth y n8n también requieren sus servicios/credenciales reales.
 
-Los datos de ejemplo son ficticios. Para ventas reales, define política de privacidad, acceso, retención, copias cifradas y procedimientos de respuesta a incidentes antes de lanzar públicamente.
+## Vercel Services
 
-## Publicación en Vercel
+La configuración principal es `vercel.json`: el rewrite `/api/*` dirige al backend y el resto al frontend React/Vite. Selecciona **Framework Preset: Services** y el directorio del proyecto `./`. MySQL y n8n son servicios externos, por lo que requieren acceso de red y TLS. La lista de variables está en `.env.vercel.example`; pasos y diagnóstico de logs en `docs/VERCEL_SERVICES.md`.
 
-Usa **`PUBLICAR_EN_VERCEL.md`**. Esta versión utiliza Vercel Services con `frontend` en `/*` y `backend` en `/api/*`. En la configuración de Vercel selecciona Framework Preset `Services` y root `./`. MySQL y n8n son dependencias externas configuradas mediante variables de entorno; actualmente no se declaran bindings internos porque no hay llamadas server-to-server entre servicios Vercel.
+Antes de distribuir, usa `scripts/Empaquetar-Proyecto.ps1`. Excluye `.env` reales, node_modules, dist y `.git`. Si el ZIP anterior con `backend/.env` se compartió, considera expuestos sus valores y rota `SESSION_SECRET`, credenciales MySQL y claves/secretos de Google, además de los tokens n8n si eran reales.

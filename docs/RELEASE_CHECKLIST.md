@@ -1,44 +1,40 @@
-# Checklist de salida a producción — Raíz & Madera
+# Checklist de salida a producción — Grano & Hoja
 
-No marques la aplicación como lista para producción hasta ejecutar todos los puntos aplicables. Los checks estáticos del generador no sustituyen una prueba con servicios activos.
+No declares el servicio listo hasta completar las comprobaciones que requieren infraestructura real.
 
-## A. Instalación reproducible
+## A. Instalación y CI
 
-- [ ] Con acceso al registro npm, ejecutar `npm install` dentro de `backend/` y `frontend/`.
-- [ ] Revisar los lockfiles recién generados y versionar `backend/package-lock.json` y `frontend/package-lock.json`.
-- [ ] En backend, ejecutar `npm run check`, `npm run check:integration`, `npm test`, `npm run audit` y revisar `npm run outdated`.
-- [ ] En frontend, ejecutar `npm run audit`, `npm run outdated` y `npm run build`.
-- [ ] Corregir las vulnerabilidades moderadas/altas y volver a ejecutar las pruebas, sin `npm audit fix --force` sin revisar cambios incompatibles.
+- [ ] Con DNS/red a npm disponible, ejecutar `npm install --no-fund --no-audit` en `backend/` y `frontend/` y versionar lockfiles consistentes con cada `package.json`.
+- [ ] Backend: `npm audit --audit-level=moderate`, `npm run check`, `npm run check:integration`, `npm test`.
+- [ ] Frontend: `npm audit --audit-level=moderate`, `VITE_API_URL=/api npm run build` (en PowerShell usa `$env:VITE_API_URL='/api'`).
+- [ ] Revisar vulnerabilidades auditadas. No ejecutar `npm audit fix --force` ni introducir actualizaciones mayores no aprobadas.
+- [ ] `node scripts/check-vercel.mjs` y `node scripts/check-integration.mjs` pasan.
 
-## B. Configuración de producción
+## B. Base de datos e inventario
 
-- [ ] Servidor Linux con Docker Engine y Docker Compose v2 actualizados.
-- [ ] DNS A/AAAA de `PUBLIC_DOMAIN` apunta al servidor; firewall permite TCP 80/443.
-- [ ] Copiar `.env.production.example` a `.env.production`; generar secretos distintos y largos para contraseña de MySQL 8.4, rol de app, sesión, las dos credenciales de n8n y las tres cuentas iniciales.
-- [ ] `node scripts/check-production-env.mjs .env.production` termina con código 0 y no hay secretos versionados.
-- [ ] Confirmar que el Compose de producción no publica el puerto de MySQL 8.4 y usar solo `compose.production.yaml` en producción.
-- [ ] Registrar en Google OAuth el callback exacto `https://PUBLIC_DOMAIN/api/auth/google/callback`; completar consentimiento y estado de publicación de Google.
-- [ ] Actualizar las dos URLs del workflow n8n a `https://PUBLIC_DOMAIN/api/reportes/...`; configurar `x-service-token` para las herramientas y `x-rm-webhook-token` para el webhook con secretos diferentes.
-- [ ] Activar el workflow n8n y configurar `N8N_WEBHOOK_URL` con su URL de producción real.
+- [ ] Crear backup probado antes de migrar una base existente.
+- [ ] Ejecutar `schema.production.sql` solo en una base nueva; no en una base real existente.
+- [ ] Para una base existente compatible, revisar y aplicar `backend/migrations/004_insumos_recetas.sql` después de respaldar y comprobar migraciones anteriores.
+- [ ] Verificar con MySQL real las restricciones, stock decimal, receta, consumo por insumo, conflictos 409, rollback, concurrencia y movimientos de restitución.
+- [ ] Definir receta para cada producto que deba consumir ingredientes. Los productos sin receta no consumen ingredientes ni el campo legado `productos.stock`.
 
-## C. Despliegue y salud
+## C. Vercel, sesión y OAuth
 
-- [ ] Ejecutar `docker compose --env-file .env.production -f compose.production.yaml up -d --build`.
-- [ ] Ejecutar una sola vez el perfil bootstrap para crear las tres cuentas iniciales; proteger inmediatamente las credenciales de administración.
-- [ ] `/api/health` devuelve 200; `/api/ready` devuelve 200 y `database: ready`.
-- [ ] Ejecutar el smoke test HTTPS de `docs/PRODUCCION.md`; comprobar HSTS, `X-Content-Type-Options` y ausencia de `X-Powered-By`.
-- [ ] Probar acceso Google, login, logout, expiración de sesión, bloqueo de cuenta, permisos por rol y CSRF.
-- [ ] Probar CRUD, ventas, descuento de stock, conflicto 409, anulación dentro/fuera de 15 minutos y reportes.
-- [ ] Probar que n8n genera una sugerencia de reposición, que no modifica datos y que devuelve `{ ok, data, error }`.
+- [ ] Configurar las variables de `.env.vercel.example` para el entorno de producción y revisar `PUBLIC_HTTPS_ORIGIN`, `CORS_ORIGIN` y `FRONTEND_URL`.
+- [ ] Configurar MySQL remoto con TLS cuando corresponda y verificar `/api/ready`.
+- [ ] Configurar Google Cloud con callback exacto `https://TU_DOMINIO/api/auth/google/callback` y probar login/registro/logout con un usuario de prueba.
+- [ ] Revisar Vercel Runtime Logs y Build Logs; no diagnosticar `FUNCTION_INVOCATION_FAILED` sin el registro de ejecución.
+- [ ] Volver a desplegar después de cambiar variables de entorno.
 
-## D. Operación segura
+## D. n8n y seguridad operacional
 
-- [ ] Configurar y probar backup cifrado; restaurar el backup en una base aislada y medir que el proceso funciona.
-- [ ] Definir retención de logs y alertas de errores/login anómalo en el entorno de hosting.
-- [ ] Ejecutar OWASP ZAP contra el dominio publicado; revisar hallazgos y corregir antes de aceptar datos reales.
-- [ ] Publicar el aviso de privacidad/consentimiento aprobado para la actividad y revisar obligaciones aplicables de la Ley 8968 de Costa Rica.
-- [ ] Guardar colección Postman y evidencias de las pruebas; terminar la bitácora y ensayar la demo.
+- [ ] Importar `n8n/workflow_grano_hoja.json` en la instancia oficial; configurar credencial de modelo y ambos headers de auth.
+- [ ] Verificar `N8N_WEBHOOK_URL`, `N8N_API_BASE_URL` y dos tokens distintos.
+- [ ] Confirmar que n8n puede consultar `GET /api/insumos/bajo-minimo`, `/api/reportes/ventas-semana` y `/api/reportes/consumo-insumos-semana`.
+- [ ] Configurar y restaurar un backup cifrado en base aislada.
+- [ ] Definir retención/alertas de logs, política de privacidad y proceso de incidente.
+- [ ] Ejecutar pruebas HTTPS, roles, CSRF, cookies, rate limit y escáner de seguridad desde el entorno publicado.
 
-## Estado al generar el ZIP
+## Estado comprobado en la auditoría
 
-Verificaciones estáticas: `backend/npm run check`, 11 comprobaciones `check:integration`, sintaxis de 30 archivos JS/JSX, parse de YAML/JSON y shell scripts. La suite de Node ejecutó 12 pruebas correctas, pero la suite completa no terminó porque no se pudo instalar `zod` desde npm en el entorno de generación. No se ejecutaron Docker, MySQL 8.4, build de Vite, OAuth real, n8n ni un dominio HTTPS; estos puntos siguen pendientes.
+Verificados con módulos disponibles: 39/39 tests backend, sintaxis de 52 archivos, 31/31 contratos estáticos de integración, 20/20 checks de Vercel y parseo JSON del workflow/colecciones Postman. No verificados: instalación limpia, auditoría npm online, build completo, MySQL real, concurrencia real, Vercel publicado, Google OAuth real, credenciales/ejecución n8n y prueba del empaquetador PowerShell (PowerShell no está instalado en este entorno).

@@ -15,7 +15,11 @@ export function AuthProvider({ children }) {
       .catch((error) => {
         if (error.name === 'AbortError') return;
         setUser(null);
-        if (error.status !== 401 && error.status !== 403) setSessionError(error.message);
+        if (error.status !== 401 && error.status !== 403) {
+          setSessionError(error.status === 0
+            ? 'No podemos conectar con el servidor. Comprueba la conexión e inténtalo de nuevo.'
+            : 'No pudimos comprobar tu sesión. Inicia sesión y, si el problema continúa, contacta con soporte.');
+        }
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();

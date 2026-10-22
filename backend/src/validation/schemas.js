@@ -6,7 +6,9 @@ const safeText = (max, label) => z.string().trim().min(1, `${label} es obligator
 const searchText = (max = 100) => z.string().max(max, `La búsqueda no puede superar ${max} caracteres`).refine((value) => !/[\u0000-\u001F\u007F]/.test(value), 'La búsqueda contiene caracteres de control');
 const positiveId = z.string().regex(/^[1-9]\d{0,9}$/, 'debe ser un ID entero positivo').refine((value) => Number(value) <= 2147483647, 'supera el máximo permitido');
 const nonNegativeStock = z.number().int().min(0).max(1000000);
-const category = z.enum(['plantas', 'muebles', 'decoracion']);
+const cafeCategory = z.enum(['bebidas_calientes', 'bebidas_frias', 'reposteria', 'comida']);
+// Las tres categorías anteriores se conservan temporalmente para leer/editar datos que ya existían.
+const category = z.enum(['bebidas_calientes', 'bebidas_frias', 'reposteria', 'comida', 'plantas', 'muebles', 'decoracion']);
 
 export const idParamsSchema = z.object({ id: positiveId }).strict();
 export const emptyQuerySchema = z.object({}).strict();
@@ -26,12 +28,50 @@ const productShape = {
 };
 export const productCreateBodySchema = z.object(productShape).strict();
 export const productPutBodySchema = z.object(productShape).strict();
-export const productPatchBodySchema = z.object(productShape).partial().strict().refine((value) => Object.keys(value).length > 0, 'Debes enviar al menos un campo para modificar');
+// Esquema PATCH separado: los defaults de creación/PUT no deben convertir {} en un cambio válido.
+const productPatchShape = {
+  nombre: productShape.nombre,
+  descripcion: z.string().trim().max(1200, 'La descripción no puede superar 1200 caracteres')
+    .refine((value) => !/[<>]/.test(value), 'La descripción no puede contener marcado HTML'),
+  precio: productShape.precio,
+  categoria: productShape.categoria,
+  stock: productShape.stock,
+  stock_minimo: productShape.stock_minimo,
+  activo: productShape.activo,
+};
+export const productPatchBodySchema = z.object(productPatchShape).partial().strict()
+  .refine((value) => Object.keys(value).length > 0, 'Debes enviar al menos un campo para modificar');
 export const productListQuerySchema = z.object({
-  q: searchText().optional(), categoria: z.enum(['plantas', 'muebles', 'decoracion']).optional(),
+  q: searchText().optional(), categoria: category.optional(),
   orden: z.enum(['nombre', 'precio', 'categoria', 'stock']).optional(), direccion: z.enum(['asc', 'desc']).optional(),
   activo: z.enum(['true', 'false']).optional(), bajo_stock: z.enum(['true', 'false']).optional(),
 }).strict();
+
+const quantity3 = z.number().finite().min(0).max(999999999.999)
+  .refine((value) => Math.abs(value * 1000 - Math.round(value * 1000)) < 1e-7, 'Usa como máximo tres decimales');
+const positiveQuantity3 = quantity3.refine((value) => value > 0, 'La cantidad debe ser mayor que cero');
+const insumoShape = {
+  nombre: safeText(120, 'El nombre del insumo'),
+  unidad: safeText(20, 'La unidad'),
+  stock: quantity3,
+  stock_minimo: quantity3,
+  activo: z.boolean().optional(),
+};
+export const insumoCreateBodySchema = z.object(insumoShape).strict();
+export const insumoPutBodySchema = z.object(insumoShape).strict();
+const insumoPatchShape = { ...insumoShape };
+export const insumoPatchBodySchema = z.object(insumoPatchShape).partial().strict()
+  .refine((value) => Object.keys(value).length > 0, 'Debes enviar al menos un campo para modificar');
+export const insumoListQuerySchema = z.object({
+  q: searchText(120).optional(),
+  bajo_minimo: z.enum(['true', 'false']).optional(),
+  orden: z.enum(['nombre', 'stock', 'stock_actual', 'stock_minimo', 'unidad']).optional(),
+  direccion: z.enum(['asc', 'desc']).optional(),
+}).strict();
+const recipeLineSchema = z.object({ insumo_id: z.number().int().positive().max(2147483647), cantidad: positiveQuantity3 }).strict();
+export const recetaReplaceBodySchema = z.object({ items: z.array(recipeLineSchema).max(100, 'Una receta no puede superar 100 ingredientes') }).strict()
+  .refine((value) => new Set(value.items.map((item) => item.insumo_id)).size === value.items.length, 'No repitas un insumo dentro de la misma receta');
+
 export const orderListQuerySchema = z.object({
   estado: z.union([z.enum(['pendiente', 'confirmado', 'anulado']), z.literal('')]).optional(),
   metodo_pago: z.union([z.enum(['efectivo', 'tarjeta', 'sinpe_movil']), z.literal('')]).optional(),

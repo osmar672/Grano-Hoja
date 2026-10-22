@@ -6,6 +6,7 @@ import createMySQLSessionStore from 'express-mysql-session';
 import { pool } from './db.js';
 import { authRouter } from './routes/auth.routes.js';
 import { productosRouter } from './routes/productos.routes.js';
+import { insumosRouter } from './routes/insumos.routes.js';
 import { pedidosRouter } from './routes/pedidos.routes.js';
 import { resumenRouter } from './routes/resumen.routes.js';
 import { reportesRouter } from './routes/reportes.routes.js';
@@ -16,27 +17,32 @@ import { requestLogger } from './middleware/requestLogger.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import { getConfiguredOrigins, getPublicHttpsOrigin } from './utils/deploymentOrigin.js';
 
-const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret || Buffer.byteLength(sessionSecret) < 32) {
-  throw new Error('SESSION_SECRET debe contener al menos 32 bytes aleatorios. Revisa backend/.env.example.');
+function failStartupConfig(variable, reason, message) {
+  // El log nombra la variable y el tipo de fallo; nunca registra su valor.
+  console.error(JSON.stringify({ level: 'error', event: 'config.startup_failed', variable, reason }));
+  throw new Error(message);
 }
+
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) failStartupConfig('SESSION_SECRET', 'missing', 'Falta la variable obligatoria SESSION_SECRET. Configúrala en el entorno del backend.');
+if (Buffer.byteLength(sessionSecret) < 32) failStartupConfig('SESSION_SECRET', 'invalid_length', 'SESSION_SECRET debe contener al menos 32 bytes aleatorios.');
 
 const isProduction = process.env.NODE_ENV === 'production';
 const isVercelRuntime = process.env.VERCEL === '1' || Boolean(process.env.VERCEL_URL);
 const publicHttpsOrigin = getPublicHttpsOrigin();
 const allowedOrigins = getConfiguredOrigins();
 if (!allowedOrigins.length || allowedOrigins.includes('*')) {
-  throw new Error('CORS_ORIGIN debe ser una lista explícita de orígenes; no se permite * con sesiones.');
+  failStartupConfig('CORS_ORIGIN', !allowedOrigins.length ? 'missing_or_empty' : 'wildcard_forbidden', 'CORS_ORIGIN debe ser una lista explícita de orígenes; no se permite * con sesiones.');
 }
 if (isProduction) {
   if (!publicHttpsOrigin) {
-    throw new Error('PUBLIC_HTTPS_ORIGIN es obligatorio en producción, por ejemplo https://app.tudominio.com.');
+    failStartupConfig('PUBLIC_HTTPS_ORIGIN', 'missing', 'Falta la variable obligatoria PUBLIC_HTTPS_ORIGIN en producción.');
   }
   let parsedPublicOrigin;
   try { parsedPublicOrigin = new URL(publicHttpsOrigin); }
-  catch { throw new Error('PUBLIC_HTTPS_ORIGIN no es una URL válida.'); }
+  catch { failStartupConfig('PUBLIC_HTTPS_ORIGIN', 'invalid_url', 'PUBLIC_HTTPS_ORIGIN no es una URL válida.'); }
   if (parsedPublicOrigin.protocol !== 'https:' || parsedPublicOrigin.pathname !== '/' || parsedPublicOrigin.search || parsedPublicOrigin.hash) {
-    throw new Error('PUBLIC_HTTPS_ORIGIN debe ser un origen HTTPS sin ruta, consulta ni fragmento.');
+    failStartupConfig('PUBLIC_HTTPS_ORIGIN', 'invalid_origin', 'PUBLIC_HTTPS_ORIGIN debe ser un origen HTTPS sin ruta, consulta ni fragmento.');
   }
 }
 
@@ -119,9 +125,9 @@ const MySQLStore = createMySQLSessionStore(session);
 export const sessionStore = new MySQLStore({
   host: process.env.DB_HOST || '127.0.0.1',
   port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER || 'raiz_app',
+  user: process.env.DB_USER || 'grano_app',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'raiz_madera',
+  database: process.env.DB_NAME || 'grano_hoja',
   timezone: 'Z',
   clearExpired: true,
   checkExpirationInterval: 15 * 60 * 1000,
@@ -131,7 +137,7 @@ export const sessionStore = new MySQLStore({
   schema: { tableName: 'user_sessions', columnNames: { session_id: 'session_id', expires: 'expires', data: 'data' } },
 });
 app.use(session({
-  name: process.env.SESSION_COOKIE_NAME || 'rm.sid',
+  name: process.env.SESSION_COOKIE_NAME || 'gh.sid',
   secret: sessionSecret,
   store: sessionStore,
   resave: false,
@@ -151,7 +157,7 @@ app.use(session({
 // El callback OAuth es GET y valida state, nonce y PKCE en su propio controlador.
 app.use(csrfProtection);
 
-app.get('/api/health', (_req, res) => res.set('Cache-Control', 'no-store').json({ ok: true, message: 'API Raíz & Madera activa' }));
+app.get('/api/health', (_req, res) => res.set('Cache-Control', 'no-store').json({ ok: true, message: 'API Grano & Hoja activa' }));
 app.get('/api/ready', async (_req, res, next) => {
   try {
     await pool.query('SELECT 1');
@@ -165,6 +171,7 @@ app.use('/api/admin', adminRouter);
 
 // Cada router aplica autenticación, permisos por rol y validación según el método y recurso.
 app.use('/api/productos', productosRouter);
+app.use('/api/insumos', insumosRouter);
 app.use('/api/pedidos', pedidosRouter);
 app.use('/api/resumen', resumenRouter);
 app.use('/api/reportes', reportesRouter);

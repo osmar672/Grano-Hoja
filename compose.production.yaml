@@ -9,6 +9,7 @@ services:
       MYSQL_APP_USER: ${APP_DB_USER:?Define APP_DB_USER in .env.production}
       MYSQL_APP_PASSWORD: ${APP_DB_PASSWORD:?Define APP_DB_PASSWORD in .env.production}
       TZ: UTC
+    # Identificador histórico preservado para no desconectar el volumen de datos existente.
     volumes:
       - raiz_madera_mysql_prod_data:/var/lib/mysql
       - ./deploy/mysql/00-create-app-user.sh:/docker-entrypoint-initdb.d/00-create-app-user.sh:ro
@@ -38,7 +39,7 @@ services:
       PUBLIC_HTTPS_ORIGIN: https://${PUBLIC_DOMAIN}
       FRONTEND_URL: https://${PUBLIC_DOMAIN}
       SESSION_SECRET: ${SESSION_SECRET:?Generate SESSION_SECRET}
-      SESSION_COOKIE_NAME: rm.sid
+      SESSION_COOKIE_NAME: gh.sid
       SESSION_MINUTES: ${SESSION_MINUTES:-30}
       TRUST_PROXY_HOPS: "2"
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Configure OAuth Client ID}

@@ -1,9 +1,12 @@
--- Raíz & Madera: MySQL 8.4, esquema de desarrollo con datos demostrativos.
+-- Grano & Hoja: MySQL 8.4, esquema de desarrollo con datos de demostración de cafetería.
 -- IMPORTANTE: este archivo borra las tablas de desarrollo si se vuelve a importar.
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS admin_audit_events;
+DROP TABLE IF EXISTS movimientos_inventario;
+DROP TABLE IF EXISTS recetas;
+DROP TABLE IF EXISTS insumos;
 DROP TABLE IF EXISTS pedido_items;
 DROP TABLE IF EXISTS pedidos;
 DROP TABLE IF EXISTS productos;
@@ -64,12 +67,43 @@ CREATE TABLE productos (
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   CONSTRAINT productos_nombre_nonempty CHECK (CHAR_LENGTH(TRIM(nombre)) > 0),
   CONSTRAINT productos_price_positive CHECK (precio > 0),
-  CONSTRAINT productos_category_allowed CHECK (categoria IN ('plantas','muebles','decoracion')),
+  CONSTRAINT productos_category_allowed CHECK (categoria IN ('bebidas_calientes','bebidas_frias','reposteria','comida','plantas','muebles','decoracion')),
   CONSTRAINT productos_stock_nonnegative CHECK (stock >= 0),
   CONSTRAINT productos_stock_min_nonnegative CHECK (stock_minimo >= 0),
   KEY productos_categoria_activo_idx (categoria, activo),
   KEY productos_stock_idx (stock, stock_minimo),
   KEY productos_nombre_idx (nombre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS insumos (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(120) NOT NULL,
+  unidad VARCHAR(20) NOT NULL,
+  stock_actual DECIMAL(12,3) NOT NULL DEFAULT 0.000,
+  stock_minimo DECIMAL(12,3) NOT NULL DEFAULT 0.000,
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CONSTRAINT insumos_nombre_nonempty CHECK (CHAR_LENGTH(TRIM(nombre)) > 0),
+  CONSTRAINT insumos_unidad_nonempty CHECK (CHAR_LENGTH(TRIM(unidad)) > 0),
+  CONSTRAINT insumos_stock_nonnegative CHECK (stock_actual >= 0),
+  CONSTRAINT insumos_stock_min_nonnegative CHECK (stock_minimo >= 0),
+  UNIQUE KEY insumos_nombre_uq (nombre),
+  KEY insumos_bajo_minimo_idx (activo, stock_actual, stock_minimo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS recetas (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  producto_id INT UNSIGNED NOT NULL,
+  insumo_id INT UNSIGNED NOT NULL,
+  cantidad DECIMAL(12,3) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CONSTRAINT recetas_cantidad_positive CHECK (cantidad > 0),
+  CONSTRAINT recetas_producto_fk FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE,
+  CONSTRAINT recetas_insumo_fk FOREIGN KEY (insumo_id) REFERENCES insumos(id) ON DELETE RESTRICT,
+  UNIQUE KEY recetas_producto_insumo_uq (producto_id, insumo_id),
+  KEY recetas_insumo_idx (insumo_id, producto_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE pedidos (
@@ -107,44 +141,67 @@ CREATE TABLE pedido_items (
   KEY pedido_items_producto_idx (producto_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE IF NOT EXISTS movimientos_inventario (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  insumo_id INT UNSIGNED NOT NULL,
+  pedido_id INT UNSIGNED NULL,
+  tipo ENUM('consumo','restitucion','ajuste') NOT NULL,
+  cantidad DECIMAL(12,3) NOT NULL,
+  fecha DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CONSTRAINT movimientos_cantidad_positive CHECK (cantidad > 0),
+  CONSTRAINT movimientos_insumo_fk FOREIGN KEY (insumo_id) REFERENCES insumos(id) ON DELETE RESTRICT,
+  CONSTRAINT movimientos_pedido_fk FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE RESTRICT,
+  UNIQUE KEY movimientos_pedido_insumo_tipo_uq (pedido_id, insumo_id, tipo),
+  KEY movimientos_insumo_fecha_idx (insumo_id, fecha DESC),
+  KEY movimientos_pedido_idx (pedido_id, tipo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
 INSERT INTO productos(id,nombre,descripcion,precio,categoria,stock,stock_minimo,activo) VALUES
-(1,'Monstera deliciosa','Planta tropical de hojas grandes y recortadas. Ideal para espacios luminosos sin sol directo.',12500.00,'plantas',8,4,1),
-(2,'Sansevieria','Planta resistente y de bajo mantenimiento en maceta de vivero.',7800.00,'plantas',3,5,1),
-(3,'Ficus lyrata','Ficus decorativo de porte vertical, pensado para salas y recibidores.',28500.00,'plantas',4,2,1),
-(4,'Suculenta en maceta cerámica','Suculenta pequeña en maceta de acabado mate.',4200.00,'plantas',14,6,1),
-(5,'Mesa auxiliar Roble','Mesa lateral compacta de madera tono roble con acabado natural.',45900.00,'muebles',2,3,1),
-(6,'Silla Nórdica','Silla de líneas limpias, asiento cómodo y patas de madera.',38500.00,'muebles',6,2,1),
-(7,'Estante Botánico','Estante de madera con tres niveles para plantas y objetos decorativos.',62900.00,'muebles',1,2,1),
-(8,'Banco de madera','Banco versátil para entrada, balcón techado o pie de cama.',34900.00,'muebles',5,2,1),
-(9,'Maceta Arena','Maceta cerámica color arena con orificio de drenaje.',6500.00,'decoracion',12,5,1),
-(10,'Jarrón Orgánico','Jarrón decorativo de silueta orgánica en tono crema.',9800.00,'decoracion',2,4,1),
-(11,'Canasto de fibra natural','Canasto artesanal para cubremaceta, textiles u organización.',8900.00,'decoracion',7,3,1),
-(12,'Lámpara de mesa Lino','Lámpara de mesa con pantalla textil en color natural.',27900.00,'decoracion',3,2,1),
-(13,'Pothos colgante','Planta colgante de fácil cuidado para repisas y soportes altos.',5900.00,'plantas',0,4,1),
-(14,'Mesa de centro Bruma','Mesa baja de madera con acabado mate y proporciones minimalistas.',78900.00,'muebles',0,1,1),
-(15,'Cojín lino oliva','Cojín decorativo color oliva con funda texturizada.',11900.00,'decoracion',9,4,1);
+(1,'Espresso','Café espresso de tueste medio, preparado al momento.',1500.00,'bebidas_calientes',0,0,1),
+(2,'Americano','Espresso con agua caliente filtrada.',1800.00,'bebidas_calientes',0,0,1),
+(3,'Cappuccino','Espresso con leche vaporizada y espuma.',2200.00,'bebidas_calientes',0,0,1),
+(4,'Latte','Espresso con leche cremosa vaporizada.',2500.00,'bebidas_calientes',0,0,1),
+(5,'Mocaccino','Espresso, leche y chocolate.',2700.00,'bebidas_calientes',0,0,1),
+(6,'Cold brew','Café extraído en frío, servido con hielo.',2600.00,'bebidas_frias',0,0,1),
+(7,'Té chai','Té chai especiado con leche.',2300.00,'bebidas_calientes',0,0,1),
+(8,'Té verde','Té verde de infusión suave.',1800.00,'bebidas_calientes',0,0,1),
+(9,'Croissant','Croissant de mantequilla horneado del día.',1800.00,'reposteria',0,0,1),
+(10,'Brownie','Brownie de chocolate con centro húmedo.',1700.00,'reposteria',0,0,1),
+(11,'Galleta de avena','Galleta casera de avena.',1200.00,'reposteria',0,0,1),
+(12,'Sándwich caprese','Pan, tomate, queso y albahaca.',3500.00,'comida',0,0,1),
+(13,'Roll de canela','Roll suave con canela y glaseado.',1700.00,'reposteria',0,0,1),
+(14,'Chocolate caliente','Chocolate con leche vaporizada.',2300.00,'bebidas_calientes',0,0,1),
+(15,'Agua embotellada','Agua embotellada individual.',1000.00,'bebidas_frias',0,0,1);
+
+INSERT INTO insumos(id,nombre,unidad,stock_actual,stock_minimo,activo) VALUES
+(1,'Café en grano','g',4500.000,500.000,1),(2,'Leche','ml',12000.000,3000.000,1),
+(3,'Agua filtrada','ml',20000.000,5000.000,1),(4,'Azúcar','g',2000.000,500.000,1),
+(5,'Chocolate','g',1000.000,300.000,1),(6,'Té chai','g',600.000,150.000,1),
+(7,'Té verde','g',450.000,100.000,1),(8,'Vaso compostable','unidad',200.000,50.000,1),
+(9,'Croissant','unidad',40.000,10.000,1),(10,'Brownie','unidad',30.000,8.000,1),
+(11,'Galleta de avena','unidad',50.000,12.000,1),(12,'Pan para sándwich','unidad',24.000,6.000,1),
+(13,'Roll de canela','unidad',25.000,6.000,1),(14,'Agua embotellada','unidad',36.000,10.000,1);
+
+INSERT INTO recetas(producto_id,insumo_id,cantidad) VALUES
+(1,1,18.000),(2,1,18.000),(2,3,180.000),(3,1,18.000),(3,2,140.000),
+(4,1,18.000),(4,2,220.000),(5,1,18.000),(5,2,160.000),(5,4,8.000),(5,5,20.000),
+(6,1,30.000),(6,3,250.000),(6,8,1.000),(7,2,180.000),(7,4,8.000),(7,6,5.000),(7,8,1.000),
+(8,3,250.000),(8,7,3.000),(8,8,1.000),(9,9,1.000),(10,10,1.000),(11,11,1.000),
+(12,12,1.000),(13,13,1.000),(14,2,200.000),(14,4,10.000),(14,5,25.000),(14,8,1.000),(15,14,1.000);
 
 INSERT INTO pedidos(id,fecha,fecha_confirmacion,metodo_pago,subtotal,impuesto,total,estado) VALUES
-(1,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 6 DAY),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 6 DAY)+INTERVAL 2 MINUTE,'efectivo',23200,3016,26216,'confirmado'),
-(2,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 6 DAY)+INTERVAL 3 HOUR,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 6 DAY)+INTERVAL 3 HOUR+INTERVAL 2 MINUTE,'tarjeta',12500,1625,14125,'confirmado'),
-(3,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 5 DAY),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 5 DAY)+INTERVAL 2 MINUTE,'sinpe_movil',45900,5967,51867,'confirmado'),
-(4,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 5 DAY)+INTERVAL 2 HOUR,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 5 DAY)+INTERVAL 2 HOUR+INTERVAL 2 MINUTE,'efectivo',19600,2548,22148,'confirmado'),
-(5,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 4 DAY),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 4 DAY)+INTERVAL 2 MINUTE,'tarjeta',28500,3705,32205,'confirmado'),
-(6,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 4 DAY)+INTERVAL 4 HOUR,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 4 DAY)+INTERVAL 4 HOUR+INTERVAL 2 MINUTE,'sinpe_movil',7800,1014,8814,'confirmado'),
-(7,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 3 DAY),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 3 DAY)+INTERVAL 2 MINUTE,'efectivo',62900,8177,71077,'confirmado'),
-(8,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 3 DAY)+INTERVAL 3 HOUR,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 3 DAY)+INTERVAL 3 HOUR+INTERVAL 2 MINUTE,'tarjeta',56900,7397,64297,'confirmado'),
-(9,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 2 DAY),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 2 DAY)+INTERVAL 2 MINUTE,'sinpe_movil',6500,845,7345,'confirmado'),
-(10,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 2 DAY)+INTERVAL 5 HOUR,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 2 DAY)+INTERVAL 5 HOUR+INTERVAL 2 MINUTE,'efectivo',70300,9139,79439,'confirmado'),
-(11,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 1 DAY),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 1 DAY)+INTERVAL 2 MINUTE,'tarjeta',44000,5720,49720,'confirmado'),
-(12,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 5 MINUTE),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 5 MINUTE)+INTERVAL 2 MINUTE,'sinpe_movil',18500,2405,20905,'confirmado'),
-(13,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 12 HOUR),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 12 HOUR)+INTERVAL 2 MINUTE,'efectivo',27900,3627,31527,'anulado'),
-(14,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 8 HOUR),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 8 HOUR)+INTERVAL 2 MINUTE,'tarjeta',9800,1274,11074,'anulado'),
-(15,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 1 HOUR),NULL,'efectivo',22700,2951,25651,'pendiente');
+(1,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 6 DAY),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 6 DAY)+INTERVAL 2 MINUTE,'efectivo',3300.00,429.00,3729.00,'confirmado'),
+(2,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 3 DAY),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 3 DAY)+INTERVAL 2 MINUTE,'tarjeta',6100.00,793.00,6893.00,'confirmado'),
+(3,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 1 DAY),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 1 DAY)+INTERVAL 2 MINUTE,'sinpe_movil',7300.00,949.00,8249.00,'confirmado'),
+(4,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 1 HOUR),NULL,'efectivo',3800.00,494.00,4294.00,'pendiente'),
+(5,DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 2 DAY),DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 2 DAY)+INTERVAL 2 MINUTE,'tarjeta',3500.00,455.00,3955.00,'anulado');
 
 INSERT INTO pedido_items(id,pedido_id,producto_id,cantidad,precio_unitario) VALUES
-(1,1,1,1,12500),(2,1,4,1,4200),(3,1,9,1,6500),(4,2,1,1,12500),(5,3,5,1,45900),
-(6,4,4,1,4200),(7,4,11,1,8900),(8,4,9,1,6500),(9,5,3,1,28500),(10,6,2,1,7800),
-(11,7,7,1,62900),(12,8,6,1,38500),(13,8,9,1,6500),(14,8,15,1,11900),(15,9,9,1,6500),
-(16,10,8,1,34900),(17,10,10,1,9800),(18,10,4,1,4200),(19,10,11,1,8900),(20,10,1,1,12500),
-(21,11,12,1,27900),(22,11,15,1,11900),(23,11,4,1,4200),(24,12,1,1,12500),(25,12,4,1,4200),
-(26,12,9,1,1800),(27,13,12,1,27900),(28,14,10,1,9800),(29,15,2,1,7800),(30,15,9,1,6500),(31,15,4,2,4200);
+(1,1,1,1,1500.00),(2,1,9,1,1800.00),(3,2,3,2,2200.00),(4,2,10,1,1700.00),
+(5,3,4,2,2500.00),(6,3,7,1,2300.00),(7,4,6,1,2600.00),(8,4,11,1,1200.00),(9,5,12,1,3500.00);
+
+INSERT INTO movimientos_inventario(insumo_id,pedido_id,tipo,cantidad) VALUES
+(1,1,'consumo',18.000),(9,1,'consumo',1.000),(1,2,'consumo',36.000),(2,2,'consumo',280.000),
+(10,2,'consumo',1.000),(1,3,'consumo',36.000),(2,3,'consumo',620.000),(4,3,'consumo',8.000),
+(6,3,'consumo',5.000),(8,3,'consumo',1.000);

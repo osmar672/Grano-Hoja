@@ -1,3 +1,5 @@
+> Documento histórico, escrito cuando el proyecto se llamaba Raíz & Madera.
+
 # Fase 2 de seguridad — Raíz & Madera
 
 - Los endpoints de catálogo, ventas, resumen y agente tienen middleware de sesión y rol aplicado en Express.

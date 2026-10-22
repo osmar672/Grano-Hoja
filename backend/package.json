@@ -1,9 +1,9 @@
 {
-  "name": "raiz-madera-api",
+  "name": "grano-hoja-api",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "API REST para inventario y ventas de Raíz & Madera",
+  "description": "API REST para punto de venta e inventario de la cafetería Grano & Hoja",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",

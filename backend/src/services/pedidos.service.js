@@ -1,5 +1,6 @@
 import { pool } from '../db.js';
 import { AppError } from '../utils/AppError.js';
+import { calcularConsumoInsumos, validarStockDeConsumo } from './consumo-insumos.js';
 
 const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
 function validateItems(items) {
@@ -82,34 +83,69 @@ export async function confirmarPedido(id) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { rows: orderRows } = await client.query('SELECT * FROM pedidos WHERE id=? FOR UPDATE', [id]); const order = orderRows[0];
+    const { rows: orderRows } = await client.query('SELECT * FROM pedidos WHERE id=? FOR UPDATE', [id]);
+    const order = orderRows[0];
     if (!order) throw new AppError(404, 'Venta no encontrada');
     if (order.estado !== 'pendiente') throw new AppError(409, `Solo se puede confirmar una venta pendiente; estado actual: ${order.estado}`);
-    const { rows: lines } = await client.query(`SELECT pi.producto_id, pr.nombre, SUM(pi.cantidad) AS cantidad
-      FROM pedido_items pi JOIN productos pr ON pr.id=pi.producto_id WHERE pi.pedido_id=?
-      GROUP BY pi.producto_id,pr.nombre ORDER BY pi.producto_id`, [id]);
+
+    const { rows: lines } = await client.query(`SELECT producto_id,SUM(cantidad) AS cantidad
+      FROM pedido_items WHERE pedido_id=? GROUP BY producto_id ORDER BY producto_id`, [id]);
     if (!lines.length) throw new AppError(409, 'La venta no contiene productos');
-    const ids = lines.map((line) => Number(line.producto_id));
-    const { rows: locked } = await client.query(`SELECT id,nombre,stock,activo FROM productos WHERE id IN (${inSql(ids)}) ORDER BY id FOR UPDATE`, ids);
-    const inventory = new Map(locked.map((p) => [Number(p.id), p]));
+    const productIds = lines.map((line) => Number(line.producto_id)).sort((a, b) => a - b);
+
+    // Bloqueo estable por ID; reemplazar una receta bloquea la fila de su producto en modo exclusivo.
+    const { rows: products } = await client.query(`SELECT id,nombre,activo FROM productos
+      WHERE id IN (${inSql(productIds)}) ORDER BY id FOR SHARE`, productIds);
+    const productById = new Map(products.map((product) => [Number(product.id), product]));
     for (const line of lines) {
-      const product = inventory.get(Number(line.producto_id));
-      if (!product || !product.activo) throw new AppError(409, `${line.nombre} no está disponible`);
-      if (Number(product.stock) < Number(line.cantidad)) throw new AppError(409, `Stock insuficiente para ${product.nombre}: se necesitan ${line.cantidad} y quedan ${product.stock}`);
+      const product = productById.get(Number(line.producto_id));
+      if (!product || !product.activo) throw new AppError(409, `${product?.nombre || `El producto ${line.producto_id}`} no está disponible para la venta`);
     }
-    for (const line of lines) await client.query('UPDATE productos SET stock=stock-?, updated_at=UTC_TIMESTAMP(3) WHERE id=?', [Number(line.cantidad),line.producto_id]);
+
+    const { rows: recipes } = await client.query(`SELECT r.producto_id,r.insumo_id,r.cantidad,
+        i.nombre,i.unidad,i.activo AS insumo_activo
+      FROM recetas r JOIN insumos i ON i.id=r.insumo_id
+      WHERE r.producto_id IN (${inSql(productIds)}) ORDER BY r.insumo_id,r.producto_id`, productIds);
+    const consumption = calcularConsumoInsumos(lines, recipes);
+
+    if (consumption.length) {
+      const ingredientIds = consumption.map((item) => item.insumo_id).sort((a, b) => a - b);
+      // Las filas se bloquean siempre en el mismo orden para minimizar deadlocks.
+      const { rows: inventory } = await client.query(`SELECT id,nombre,unidad,stock_actual,activo
+        FROM insumos WHERE id IN (${inSql(ingredientIds)}) ORDER BY id FOR UPDATE`, ingredientIds);
+      validarStockDeConsumo(consumption, inventory);
+      const inventoryById = new Map(inventory.map((item) => [Number(item.id), item]));
+      for (const needed of consumption) {
+        const update = await client.query(`UPDATE insumos SET stock_actual=stock_actual-?,updated_at=UTC_TIMESTAMP(3)
+          WHERE id=? AND activo=1 AND stock_actual>=?`, [needed.cantidad, needed.insumo_id, needed.cantidad]);
+        if (update.rowCount !== 1) {
+          const ingredient = inventoryById.get(needed.insumo_id);
+          throw new AppError(409, `Insumo insuficiente: ${ingredient?.nombre || needed.insumo_id}. Actualiza el inventario antes de confirmar la venta.`);
+        }
+        await client.query(`INSERT INTO movimientos_inventario(insumo_id,pedido_id,tipo,cantidad)
+          VALUES(?,?,'consumo',?)`, [needed.insumo_id, id, needed.cantidad]);
+      }
+    }
+
+    // Productos sin receta se pueden vender, pero no descuentan insumos ni stock de producto.
     await client.query("UPDATE pedidos SET estado='confirmado',fecha_confirmacion=UTC_TIMESTAMP(3) WHERE id=?", [id]);
     await client.query('COMMIT');
     return obtenerPedido(id);
-  } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; }
-  finally { client.release(); }
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (error?.code === 'ER_DUP_ENTRY') throw new AppError(409, 'El consumo de esta venta ya fue registrado; revisa sus movimientos de inventario');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function anularPedido(id) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { rows } = await client.query('SELECT * FROM pedidos WHERE id=? FOR UPDATE', [id]); const order = rows[0];
+    const { rows } = await client.query('SELECT * FROM pedidos WHERE id=? FOR UPDATE', [id]);
+    const order = rows[0];
     if (!order) throw new AppError(404, 'Venta no encontrada');
     if (order.estado === 'anulado') throw new AppError(409, 'La venta ya está anulada');
     if (order.estado === 'pendiente') {
@@ -121,13 +157,36 @@ export async function anularPedido(id) {
     if (!confirmedAt || confirmedAt < Date.now() - 15 * 60 * 1000) {
       throw new AppError(409, 'Fuera del plazo: una venta confirmada solo se puede anular durante los primeros 15 minutos');
     }
-    const { rows: lines } = await client.query('SELECT producto_id,SUM(cantidad) AS cantidad FROM pedido_items WHERE pedido_id=? GROUP BY producto_id ORDER BY producto_id', [id]);
-    const ids = lines.map((line) => Number(line.producto_id));
-    if (ids.length) await client.query(`SELECT id FROM productos WHERE id IN (${inSql(ids)}) ORDER BY id FOR UPDATE`, ids);
-    for (const line of lines) await client.query('UPDATE productos SET stock=stock+?,updated_at=UTC_TIMESTAMP(3) WHERE id=?', [Number(line.cantidad),line.producto_id]);
+
+    // Se restituye exactamente lo consumido al confirmar, no la receta actual, que pudo cambiar después.
+    const { rows: consumed } = await client.query(`SELECT insumo_id,cantidad FROM movimientos_inventario
+      WHERE pedido_id=? AND tipo='consumo' ORDER BY insumo_id`, [id]);
+    const { rows: alreadyRestored } = await client.query(`SELECT insumo_id FROM movimientos_inventario
+      WHERE pedido_id=? AND tipo='restitucion' ORDER BY insumo_id`, [id]);
+    const restoredIds = new Set(alreadyRestored.map((row) => Number(row.insumo_id)));
+    const toRestore = consumed.filter((row) => !restoredIds.has(Number(row.insumo_id)));
+    const ingredientIds = [...new Set(toRestore.map((row) => Number(row.insumo_id)))].sort((a, b) => a - b);
+    if (ingredientIds.length) {
+      const { rows: lockedIngredients } = await client.query(`SELECT id,nombre FROM insumos
+        WHERE id IN (${inSql(ingredientIds)}) ORDER BY id FOR UPDATE`, ingredientIds);
+      const found = new Set(lockedIngredients.map((row) => Number(row.id)));
+      const missing = ingredientIds.find((ingredientId) => !found.has(ingredientId));
+      if (missing) throw new AppError(409, `No se puede restituir el insumo ${missing}: ya no existe en el inventario`);
+      for (const movement of toRestore) {
+        const ingredientId = Number(movement.insumo_id);
+        await client.query(`UPDATE insumos SET stock_actual=stock_actual+?,updated_at=UTC_TIMESTAMP(3) WHERE id=?`, [Number(movement.cantidad), ingredientId]);
+        await client.query(`INSERT INTO movimientos_inventario(insumo_id,pedido_id,tipo,cantidad)
+          VALUES(?,?,'restitucion',?)`, [ingredientId, id, Number(movement.cantidad)]);
+      }
+    }
     await client.query("UPDATE pedidos SET estado='anulado' WHERE id=?", [id]);
     await client.query('COMMIT');
     return obtenerPedido(id);
-  } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; }
-  finally { client.release(); }
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (error?.code === 'ER_DUP_ENTRY') throw new AppError(409, 'La restitución de esta venta ya fue registrada; revisa sus movimientos de inventario');
+    throw error;
+  } finally {
+    client.release();
+  }
 }

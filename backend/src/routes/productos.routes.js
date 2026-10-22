@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as controller from '../controllers/productos.controller.js';
+import * as recetasController from '../controllers/recetas.controller.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole, ROLE } from '../middleware/requireRole.js';
 import { validateRequest } from '../middleware/validateRequest.js';
@@ -10,6 +11,7 @@ import {
   productListQuerySchema,
   productPatchBodySchema,
   productPutBodySchema,
+  recetaReplaceBodySchema,
   emptyQuerySchema,
   optionalEmptyBodySchema,
 } from '../validation/schemas.js';
@@ -21,6 +23,8 @@ const catalogManagers = [ROLE.ADMIN, ROLE.MANAGER];
 productosRouter.use(requireAuth);
 productosRouter.get('/', requireRole(...allRoles), validateRequest({ query: productListQuerySchema, body: optionalEmptyBodySchema }), asyncHandler(controller.listar));
 productosRouter.post('/', requireRole(...catalogManagers), validateRequest({ body: productCreateBodySchema, query: emptyQuerySchema }), asyncHandler(controller.crear));
+productosRouter.get('/:id/receta', requireRole(...allRoles), validateRequest({ params: idParamsSchema, query: emptyQuerySchema, body: optionalEmptyBodySchema }), asyncHandler(recetasController.obtener));
+productosRouter.put('/:id/receta', requireRole(...catalogManagers), validateRequest({ params: idParamsSchema, body: recetaReplaceBodySchema, query: emptyQuerySchema }), asyncHandler(recetasController.reemplazar));
 productosRouter.get('/:id', requireRole(...allRoles), validateRequest({ params: idParamsSchema, query: emptyQuerySchema, body: optionalEmptyBodySchema }), asyncHandler(controller.obtener));
 productosRouter.put('/:id', requireRole(...catalogManagers), validateRequest({ params: idParamsSchema, body: productPutBodySchema, query: emptyQuerySchema }), asyncHandler(controller.actualizar));
 productosRouter.patch('/:id', requireRole(...catalogManagers), validateRequest({ params: idParamsSchema, body: productPatchBodySchema, query: emptyQuerySchema }), asyncHandler(controller.parchear));

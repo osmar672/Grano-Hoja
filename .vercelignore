@@ -18,3 +18,5 @@ backups
 *.log
 compose*.yaml
 deploy/
+# Historical-only sources are not required by either active Vercel Service.
+legacy/

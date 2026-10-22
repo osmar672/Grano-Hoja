@@ -3,36 +3,73 @@
 ### Health
 GET {{baseUrl}}/api/health
 
-### Login; the cookie is managed by REST Client in VS Code
+### Login; REST Client manages the session cookie
 POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "admin@raizymadera.local",
+  "email": "admin@granohoja.local",
   "password": "REEMPLAZA_CON_TU_PASSWORD_LOCAL"
 }
 
-### Catálogo
-GET {{baseUrl}}/api/productos?categoria=plantas&orden=nombre
+### Catálogo de cafetería
+GET {{baseUrl}}/api/productos?categoria=bebidas_calientes&orden=nombre
 
-### Inventario por debajo del mínimo
-GET {{baseUrl}}/api/reportes/productos-bajo-stock
+### Insumos bajo mínimo (requiere sesión o token de servicio)
+GET {{baseUrl}}/api/insumos/bajo-minimo
 
-### Ventas semanales para el asistente
+### Listar insumos (requiere sesión)
+GET {{baseUrl}}/api/insumos?orden=nombre
+
+### Crear un insumo de prueba (cambia nombre si ya existe)
+POST {{baseUrl}}/api/insumos
+Content-Type: application/json
+
+{
+  "nombre": "Café de prueba HTTP",
+  "unidad": "g",
+  "stock": 100,
+  "stock_minimo": 20,
+  "activo": true
+}
+
+### Leer receta del producto 1; usa un ID existente
+GET {{baseUrl}}/api/productos/1/receta
+
+### Reemplazar receta del producto 1; cambia insumo_id por un ID real
+PUT {{baseUrl}}/api/productos/1/receta
+Content-Type: application/json
+
+{
+  "items": [
+    { "insumo_id": 1, "cantidad": 18 }
+  ]
+}
+
+### Limpiar receta del producto 1 (prueba destructiva solo para entorno de prueba)
+# PUT {{baseUrl}}/api/productos/1/receta
+# Content-Type: application/json
+#
+# { "items": [] }
+
+### Reporte de ventas semanales para IA (sesión admin/encargado o token de servicio)
 GET {{baseUrl}}/api/reportes/ventas-semana
+
+### Consumo real de ingredientes de los últimos siete días
+GET {{baseUrl}}/api/reportes/consumo-insumos-semana
 
 ### Resumen de caja
 GET {{baseUrl}}/api/resumen
 
-### Ejemplo de validación; espera 400 con categoría no permitida
+### Ejemplo de validación; espera 400 por categoría inválida
 POST {{baseUrl}}/api/productos
 Content-Type: application/json
 
 {
-  "nombre": "Producto inválido",
+  "nombre": "Producto inválido de prueba",
   "descripcion": "Prueba de validación",
-  "precio": 12000,
-  "categoria": "comida",
-  "stock": 3,
-  "stock_minimo": 1
+  "precio": 1200,
+  "categoria": "categoria-no-valida",
+  "stock": 0,
+  "stock_minimo": 0
 }

@@ -18,6 +18,7 @@ export async function getOverview() {
       (SELECT COUNT(*) FROM app_users WHERE role='admin' AND active=TRUE) AS active_admins,
       (SELECT COUNT(*) FROM productos WHERE activo=TRUE) AS active_products,
       (SELECT COUNT(*) FROM productos WHERE activo=TRUE AND stock<=stock_minimo) AS low_stock_products,
+      (SELECT COUNT(*) FROM insumos WHERE activo=TRUE AND stock_actual<=stock_minimo) AS low_stock_ingredients,
       (SELECT COUNT(*) FROM pedidos WHERE estado='confirmado' AND fecha_confirmacion>=? AND fecha_confirmacion<?) AS sales_today_count,
       (SELECT COALESCE(SUM(total),0) FROM pedidos WHERE estado='confirmado' AND fecha_confirmacion>=? AND fecha_confirmacion<?) AS sales_today_total`,
     [start, end, start, end]);

@@ -38,7 +38,7 @@ export async function sugerenciaCompra(req, res) {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-rm-webhook-token': config.token,
+        'x-gh-webhook-token': config.token,
       },
       // El backend aporta la URL de la API; nunca se acepta una URL proporcionada por el navegador.
       // n8n usa este origen para llamar a los endpoints protegidos, sin localhost fijo en el workflow.

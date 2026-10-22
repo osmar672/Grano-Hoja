@@ -1,10 +1,10 @@
-# Publicar Raíz & Madera usando Vercel Services
+# Publicar Grano & Hoja usando Vercel Services
 
-Esta versión utiliza dos servicios Vercel dentro de un único proyecto: `backend` (Express) y `frontend` (Vite/React). La configuración principal es `vercel.json` en la raíz del repositorio.
+Esta versión utiliza dos servicios Vercel dentro de un único proyecto: `backend` (Express) y `frontend` (Vite/React). La configuración principal es `vercel.json` en la carpeta principal del repositorio.
 
 ## 1. Requisitos
 
-- Repositorio Git con este proyecto completo y `vercel.json` en la raíz.
+- Repositorio Git con este proyecto completo y `vercel.json` en la carpeta principal.
 - Acceso a Vercel Services (beta) y opción **Framework Preset: Services** en el proyecto.
 - MySQL 8 accesible remotamente con TLS. No puede estar únicamente en `localhost` o dentro del Docker local.
 - n8n accesible por HTTPS con el workflow importado y sus credenciales privadas configuradas.
@@ -12,10 +12,10 @@ Esta versión utiliza dos servicios Vercel dentro de un único proyecto: `backen
 
 ## 2. Importar el repositorio
 
-1. Sube el contenido completo de la carpeta `Raiz-y-Madera` a GitHub.
-2. En Vercel, importa el repositorio como proyecto desde el directorio raíz `./`.
-3. En **Settings → Build and Deployment → Framework Preset**, selecciona **Services**. No selecciones solo Vite, Express, `frontend/` ni `backend/` como proyecto raíz.
-4. Deja que `vercel.json` controle las órdenes de instalación y build por servicio. No agregues overrides globales de `Build Command`, `Install Command`, `Output Directory` o `Framework` en la raíz.
+1. Sube el contenido completo de la carpeta `Grano-Hoja` a GitHub.
+2. En Vercel, importa el repositorio como proyecto desde la carpeta principal `./`.
+3. En **Settings → Build and Deployment → Framework Preset**, selecciona **Services**. No selecciones solo Vite, Express, `frontend/` ni `backend/` como proyecto principal.
+4. Deja que `vercel.json` controle las órdenes de instalación y build por servicio. No agregues overrides globales de `Build Command`, `Install Command`, `Output Directory` o `Framework` en la carpeta principal.
 5. Publica el proyecto. La primera compilación debe construir ambos servicios de forma independiente.
 
 ## 3. Enrutamiento público
@@ -69,13 +69,13 @@ Añade tu cuenta a la lista de Test users si la pantalla de consentimiento aún 
 
 ## 8. n8n
 
-Importa `n8n/workflow_raiz_madera.json` en n8n Cloud o un servidor HTTPS independiente. Configura Header Auth en el Webhook (`x-rm-webhook-token` = `N8N_WEBHOOK_AUTH_TOKEN`), Header Auth en las herramientas (`x-service-token` = `N8N_API_SERVICE_TOKEN`) y credencial real en el nodo del modelo. Configura `N8N_WEBHOOK_URL` con la Production URL y `N8N_API_BASE_URL` con el dominio Vercel.
+Importa `n8n/workflow_grano_hoja.json` en n8n Cloud o un servidor HTTPS independiente. Configura Header Auth en el Webhook (`x-gh-webhook-token` = `N8N_WEBHOOK_AUTH_TOKEN`), Header Auth en las herramientas (`x-service-token` = `N8N_API_SERVICE_TOKEN`) y credencial real en el nodo del modelo. Configura `N8N_WEBHOOK_URL` con la Production URL y `N8N_API_BASE_URL` con el dominio Vercel.
 
 Express envía a n8n la URL base configurada; los nodos HTTP Request Tool construyen los endpoints desde la entrada validada. No pegues credenciales en el JSON del workflow.
 
 ## 9. Comprobaciones antes de producción
 
-Desde la raíz del repo:
+Desde la carpeta principal del repositorio:
 
 ```bash
 node scripts/check-vercel.mjs
@@ -91,3 +91,7 @@ Cuando las dependencias estén instaladas, ejecuta también `npm test` en backen
 - Google OAuth, sesiones/CSRF, permisos por rol, CRUD, pedidos y agente n8n
 
 Vercel Services está en beta y requiere el Framework Preset `Services`. Si no aparece, revisa si tu cuenta/proyecto tiene acceso habilitado. El ZIP no se considera listo para producción hasta que los tests y las conexiones reales pasan.
+
+## Diagnóstico del error 500
+
+En Vercel abre el proyecto → **Deployments** → despliegue activo → **Functions** → `index.js` → **Logs**. Filtra por la ruta y hora del fallo y busca `config.startup_failed`. El backend registra el nombre de una variable requerida y la categoría del error, sin mostrar su valor. Revisa `SESSION_SECRET`, `PUBLIC_HTTPS_ORIGIN`, `CORS_ORIGIN`, las variables `DB_*`, `SESSION_DB_POOL_MAX`, las variables `GOOGLE_*`, `FRONTEND_URL`, las variables `N8N_*`, `SESSION_COOKIE_NAME`, `SESSION_MINUTES` y `TRUST_PROXY_HOPS`.

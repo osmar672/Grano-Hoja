@@ -1,3 +1,5 @@
+> Documento histórico, escrito cuando el proyecto se llamaba Raíz & Madera.
+
 # Fase 3 — Cabeceras, CORS, CSRF y HTTPS
 
 ## Implementado en código

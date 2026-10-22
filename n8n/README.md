@@ -1,13 +1,15 @@
-# Workflow de reposición — Raíz & Madera
+# Asistente de compras — Grano & Hoja
 
-El archivo `workflow_raiz_madera.json` debe importarse en tu propia instancia n8n. No contiene credenciales por seguridad.
+El workflow oficial que se importa en n8n es `workflow_grano_hoja.json`. El workflow de la etapa anterior se conserva en `../legacy/n8n/` y no forma parte del despliegue actual.
 
-Sigue la guía paso a paso [`../docs/MYSQL_N8N_SETUP.md`](../docs/MYSQL_N8N_SETUP.md) para iniciar MySQL 8.4 y n8n con Docker Desktop, arrancar Express/React, crear las dos credenciales Header Auth, seleccionar la credencial OpenAI Chat Model, activar el Webhook y probar la respuesta desde el frontend.
+## Configuración de credenciales
 
-## Arquitectura
+1. Importa `workflow_grano_hoja.json` en tu instancia n8n.
+2. En el nodo **Webhook compras**, crea/selecciona credencial **Header Auth** con nombre de cabecera `x-gh-webhook-token` y un valor secreto independiente de al menos 32 bytes. Configura el mismo valor en `N8N_WEBHOOK_AUTH_TOKEN` del backend.
+3. En los tres nodos HTTP Request Tool, configura la credencial **Header Auth** para enviar `x-service-token` con el valor de `N8N_API_SERVICE_TOKEN`. Ese token permite solo los endpoints de lectura para el agente; no debe ser igual al token del webhook.
+4. Configura la credencial del modelo de IA (no se incluye ninguna clave dentro del JSON exportado).
+5. Activa el workflow y copia su URL **Production** a `N8N_WEBHOOK_URL` del backend. La ruta es `/webhook/grano-hoja/asistente-compras`.
+6. Define `N8N_API_BASE_URL` en el backend con el origen público del servicio API, sin `/api` ni ruta final. En desarrollo local con Docker puede ser `http://host.docker.internal:3001`; en Vercel, el dominio público de la API.
+7. Verifica que `GET /api/insumos/bajo-minimo`, `GET /api/reportes/ventas-semana` y `GET /api/reportes/consumo-insumos-semana` respondan con la sesión autorizada o el token de servicio, y prueba el proxy `POST /api/agente/sugerencia-compra`.
 
-`React → POST /api/agente/sugerencia-compra → Express (sesión + rol) → Webhook n8n → HTTP Request Tools → GET /api/reportes/... → MySQL`.
-
-No se conecta n8n directamente a MySQL: las herramientas acceden a reportes de solo lectura de Express con `N8N_API_SERVICE_TOKEN`. El webhook requiere un token diferente (`N8N_WEBHOOK_AUTH_TOKEN`). La respuesta de salida es `{ ok, data, error }`.
-
-Durante el desarrollo con Docker Desktop, `N8N_API_BASE_URL` suele ser `http://host.docker.internal:3001`. En Vercel, define `N8N_API_BASE_URL=https://TU_PROYECTO.vercel.app` como variable del backend. Express envía el origen ya configurado dentro del payload de llamada al Webhook; los nodos HTTP Request Tool construyen `/api/reportes/productos-bajo-stock` y `/api/reportes/ventas-semana` a partir de `apiBaseUrl` validada. No edites URL localhost en los nodos de producción ni declares esta URL como binding de Vercel: n8n está alojado externamente.
+Las herramientas de lectura usan el `apiBaseUrl` validado por el backend y no contienen URLs locales fijas. El workflow no modifica inventario ni crea órdenes de compra: solo devuelve sugerencias. La ejecución real del workflow requiere verificar credenciales y conectividad en la instancia n8n; no queda probada por una validación estática del JSON.

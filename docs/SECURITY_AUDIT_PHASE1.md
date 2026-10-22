@@ -1,3 +1,5 @@
+> Documento histórico, escrito cuando el proyecto se llamaba Raíz & Madera.
+
 # Auditoría inicial de seguridad — Raíz & Madera
 
 Hallazgos que motivaron las fases de seguridad:

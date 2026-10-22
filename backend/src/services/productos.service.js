@@ -2,7 +2,7 @@ import { pool } from '../db.js';
 import { AppError } from '../utils/AppError.js';
 
 const sortColumns = { nombre: 'p.nombre', precio: 'p.precio', categoria: 'p.categoria', stock: 'p.stock' };
-const allowedCategories = new Set(['plantas', 'muebles', 'decoracion']);
+const allowedCategories = new Set(['bebidas_calientes', 'bebidas_frias', 'reposteria', 'comida', 'plantas', 'muebles', 'decoracion']);
 function validateProduct(data = {}) {
   const nombre = typeof data.nombre === 'string' ? data.nombre.trim() : '';
   const descripcion = typeof data.descripcion === 'string' ? data.descripcion.trim() : '';

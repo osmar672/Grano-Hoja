@@ -9,7 +9,7 @@ import {
   verifyPassword,
 } from '../services/auth.service.js';
 
-const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'rm.sid';
+const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'gh.sid';
 const INVALID_CREDENTIALS = 'Credenciales incorrectas o acceso temporalmente bloqueado';
 
 function regenerateSession(req) {

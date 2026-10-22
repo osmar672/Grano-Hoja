@@ -8,6 +8,8 @@ import { emptyQuerySchema, googleStartQuerySchema, loginBodySchema, optionalEmpt
 
 export const authRouter = Router();
 
+// El contador por defecto vive en memoria de este proceso: no se comparte entre instancias serverless.
+// Para producción multiinstancia, configurar un store compartido (p. ej. Redis) cuando se apruebe añadirlo.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: Number(process.env.LOGIN_IP_LIMIT || 10),

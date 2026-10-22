@@ -18,13 +18,13 @@ export async function requireAuth(req, res, next) {
     // Comprueba el estado actual de la cuenta, no solo los datos antiguos de la sesión.
     const result = await pool.query(
       `SELECT id, email, display_name, role, active
-       FROM app_users WHERE id = $1`,
+       FROM app_users WHERE id = ?`,
       [sessionUser.id],
     );
     const user = result.rows[0];
     if (!user || !user.active) {
       await destroySession(req);
-      res.clearCookie(process.env.SESSION_COOKIE_NAME || 'rm.sid', {
+      res.clearCookie(process.env.SESSION_COOKIE_NAME || 'gh.sid', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',

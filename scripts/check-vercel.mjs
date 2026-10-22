@@ -21,8 +21,8 @@ const docs = await read('docs/VERCEL_SERVICES.md');
 
 check('Config usa Vercel Services', config.services && typeof config.services === 'object');
 check('Los nombres de servicio son backend y frontend', JSON.stringify(Object.keys(config.services || {}).sort()) === JSON.stringify(['backend', 'frontend']));
-check('Backend usa raíz, Express y entrypoint local', config.services?.backend?.root === 'backend/' && config.services?.backend?.framework === 'express' && config.services?.backend?.entrypoint === 'index.js' && await exists('backend/index.js'));
-check('Backend instala sus dependencias en su raíz', config.services?.backend?.installCommand === 'npm install' && Boolean(backendPkg.dependencies?.express) && Boolean(backendPkg.dependencies?.mysql2));
+check('Backend usa Express y entrypoint local', config.services?.backend?.root === 'backend/' && config.services?.backend?.framework === 'express' && config.services?.backend?.entrypoint === 'index.js' && await exists('backend/index.js'));
+check('Backend instala sus dependencias en su directorio', config.services?.backend?.installCommand === 'npm install' && Boolean(backendPkg.dependencies?.express) && Boolean(backendPkg.dependencies?.mysql2));
 check('Backend exporta una app Express como default', /export default app/.test(backendEntry) && /export const app = express\(\)/.test(backendApp));
 check('Backend conserva máximo de ejecución por función', config.services?.backend?.functions?.['index.js']?.maxDuration === 60);
 check('Frontend usa Vite, construye dist y tiene fallback SPA', config.services?.frontend?.root === 'frontend/' && config.services?.frontend?.framework === 'vite' && config.services?.frontend?.buildCommand === 'npm run build' && config.services?.frontend?.outputDirectory === 'dist' && config.services?.frontend?.rewrites?.some((r) => r.source === '/(.*)' && r.destination === '/index.html'));
@@ -36,10 +36,10 @@ check('MySQL y n8n se configuran como servicios externos', /DB_HOST=HOST_PUBLICO
 check('n8n recibe el origen de API validado desde Express', /apiBaseUrl: config\.apiBaseUrl/.test(agentController) && /N8N_API_BASE_URL/.test(agentController));
 check('No se declara binding ficticio entre frontend estático y backend', !config.services.frontend.bindings && !config.services.backend.bindings && /no hay actualmente un binding válido|no se declaran bindings|no se añade ningún binding/i.test(docs));
 check('Guía explica el preset Services y el alcance de rutas públicas', /Framework Preset.*Services/i.test(docs) && /\/api\/\*/.test(docs) && /frontend.*pública/i.test(docs));
-check('No quedan referencias al antiguo empaquetado de SPA', !(await exists('scripts/prepare-vercel-public.mjs')) && !(await exists('backend/src/generated-spa.js')) && !/prepare-vercel-public|generated-spa|vercel-build/.test(await read('PUBLICAR_EN_VERCEL.md')));
+check('El despliegue Services no depende del empaquetado SPA histórico', !(await exists('scripts/prepare-vercel-public.mjs')) && !(await exists('backend/src/generated-spa.js')) && !/prepare-vercel-public|generated-spa|vercel-build/.test(await read('vercel.json')) && /buildCommand.*npm run build/.test(await read('frontend/vercel.json')));
 check('Las cabeceras no introducen URL o secretos', !JSON.stringify(config).includes('GOOGLE_CLIENT_SECRET') && !JSON.stringify(config).includes('N8N_WEBHOOK_AUTH_TOKEN'));
 check('Script de validación está publicado en package.json', pkg.scripts?.['check:vercel'] === 'node scripts/check-vercel.mjs');
-check('Backend y frontend tienen sus propios package.json', await exists('backend/package.json') && await exists('frontend/package.json') && backendPkg.name === 'raiz-madera-api' && frontendPkg.name === 'raiz-madera-frontend');
+check('Backend y frontend tienen sus propios package.json', await exists('backend/package.json') && await exists('frontend/package.json') && backendPkg.name === 'grano-hoja-api' && frontendPkg.name === 'grano-hoja-frontend');
 
 for (const item of checks) process.stdout.write(`${item.ok ? 'PASS' : 'FAIL'} ${item.name}${item.detail ? ` — ${item.detail}` : ''}\n`);
 process.stdout.write(`\n${checks.filter((item) => item.ok).length}/${checks.length} verificaciones correctas.\n`);

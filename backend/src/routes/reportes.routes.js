@@ -7,3 +7,5 @@ import { emptyQuerySchema, optionalEmptyBodySchema } from '../validation/schemas
 export const reportesRouter = Router();
 reportesRouter.get('/productos-bajo-stock', requireRoleOrServiceToken(ROLE.ADMIN, ROLE.MANAGER, ROLE.CASHIER), validateRequest({ query: emptyQuerySchema, body: optionalEmptyBodySchema }), asyncHandler(controller.productosBajoStock));
 reportesRouter.get('/ventas-semana', requireRoleOrServiceToken(ROLE.ADMIN, ROLE.MANAGER), validateRequest({ query: emptyQuerySchema, body: optionalEmptyBodySchema }), asyncHandler(controller.ventasSemana));
+
+reportesRouter.get('/consumo-insumos-semana', requireRoleOrServiceToken(ROLE.ADMIN, ROLE.MANAGER), validateRequest({ query: emptyQuerySchema, body: optionalEmptyBodySchema }), asyncHandler(controller.consumoInsumosSemana));

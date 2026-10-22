@@ -47,18 +47,18 @@ foreach ($name in @('MYSQL_ROOT_PASSWORD','MYSQL_APP_PASSWORD','N8N_ENCRYPTION_K
   $value = Get-Value $rootLines $name
   if (Is-Placeholder $value) { Set-Value $rootLines $name (New-RandomHex 48) }
 }
-Set-Value $rootLines 'MYSQL_DATABASE' 'raiz_madera'
-Set-Value $rootLines 'MYSQL_APP_USER' 'raiz_app'
+Set-Value $rootLines 'MYSQL_DATABASE' 'grano_hoja'
+Set-Value $rootLines 'MYSQL_APP_USER' 'grano_app'
 [System.IO.File]::WriteAllLines($rootEnvPath, $rootLines.ToArray(), $utf8NoBom)
 
 $appPassword = Get-Value $rootLines 'MYSQL_APP_PASSWORD'
 Set-Value $backendLines 'DB_HOST' '127.0.0.1'
 Set-Value $backendLines 'DB_PORT' '3306'
-Set-Value $backendLines 'DB_USER' 'raiz_app'
-Set-Value $backendLines 'DB_NAME' 'raiz_madera'
+Set-Value $backendLines 'DB_USER' 'grano_app'
+Set-Value $backendLines 'DB_NAME' 'grano_hoja'
 Set-Value $backendLines 'DB_PASSWORD' $appPassword
 Set-Value $backendLines 'DB_SSL' 'false'
-Set-Value $backendLines 'N8N_WEBHOOK_URL' 'http://localhost:5678/webhook/raiz-madera/asistente-compras'
+Set-Value $backendLines 'N8N_WEBHOOK_URL' 'http://localhost:5678/webhook/grano-hoja/asistente-compras'
 Set-Value $backendLines 'N8N_API_BASE_URL' 'http://host.docker.internal:3001'
 Set-Value $backendLines 'FRONTEND_URL' 'http://localhost:5173'
 Set-Value $backendLines 'GOOGLE_REDIRECT_URI' 'http://localhost:3001/api/auth/google/callback'
@@ -73,9 +73,9 @@ $serviceToken = Get-Value $backendLines 'N8N_API_SERVICE_TOKEN'
 if ($webhookToken -eq $serviceToken) { Set-Value $backendLines 'N8N_API_SERVICE_TOKEN' (New-RandomHex 48) }
 
 $seedUsers = @(
-  @{ Prefix = 'SEED_ADMIN'; Email = 'admin@raizymadera.local'; Name = 'Administración'; Label = 'contraseña de la cuenta admin' },
-  @{ Prefix = 'SEED_MANAGER'; Email = 'encargado@raizymadera.local'; Name = 'Encargado de tienda'; Label = 'contraseña de la cuenta encargado' },
-  @{ Prefix = 'SEED_CASHIER'; Email = 'caja@raizymadera.local'; Name = 'Personal de caja'; Label = 'contraseña de la cuenta caja' }
+  @{ Prefix = 'SEED_ADMIN'; Email = 'admin@granoyhoja.local'; Name = 'Administración'; Label = 'contraseña de la cuenta admin' },
+  @{ Prefix = 'SEED_MANAGER'; Email = 'encargado@granoyhoja.local'; Name = 'Encargado de tienda'; Label = 'contraseña de la cuenta encargado' },
+  @{ Prefix = 'SEED_CASHIER'; Email = 'caja@granoyhoja.local'; Name = 'Personal de caja'; Label = 'contraseña de la cuenta caja' }
 )
 foreach ($user in $seedUsers) {
   $emailKey = "$($user.Prefix)_EMAIL"

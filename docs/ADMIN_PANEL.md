@@ -1,4 +1,4 @@
-# Panel de administración — Raíz & Madera
+# Panel de administración — Grano & Hoja
 
 ## Funciones
 
@@ -17,10 +17,10 @@ No se permite a un administrador cambiar su propio rol/estado desde este panel. 
 
 ## Migración de una base existente
 
-En PowerShell desde la raíz del proyecto, con Docker Compose activo:
+En PowerShell desde el directorio principal del proyecto, con Docker Compose activo:
 
 ```powershell
-Get-Content backend/migrations/003_admin_tools.sql | docker compose exec -T db mysql -u raiz_app -p raiz_madera
+Get-Content backend/migrations/003_admin_tools.sql | docker compose exec -T db mysql -u grano_app -p grano_hoja
 ```
 
 Si usas otro nombre de base o usuario, reemplázalo. En una base nueva inicializada desde `schema.sql` no hace falta correr esta migración.

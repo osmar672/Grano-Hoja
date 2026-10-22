@@ -11,9 +11,9 @@ function sslConfig() {
 const rawPool = mysql.createPool({
   host: process.env.DB_HOST || '127.0.0.1',
   port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER || 'raiz_app',
+  user: process.env.DB_USER || 'grano_app',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'raiz_madera',
+  database: process.env.DB_NAME || 'grano_hoja',
   waitForConnections: true,
   connectionLimit: Math.max(1, Math.min(12, Number(process.env.DB_POOL_MAX || (process.env.VERCEL === '1' ? 2 : 12)))),
   queueLimit: 0,
@@ -30,18 +30,7 @@ const rawPool = mysql.createPool({
   },
 });
 
-// Conserva una interfaz simple (rows/rowCount) para que servicios y controladores lean resultados igual.
-function normalizeSql(sql, params = []) {
-  const ordered = [];
-  const translated = String(sql).replace(/\$(\d+)/g, (_match, indexText) => {
-    const index = Number(indexText) - 1;
-    if (index < 0 || index >= params.length) throw new Error('Parámetros SQL inválidos');
-    ordered.push(params[index]);
-    return '?';
-  });
-  return { sql: translated, params: ordered.length ? ordered : params };
-}
-
+// Todos los servicios usan placeholders nativos de mysql2 (`?`); no se traducen placeholders PostgreSQL.
 async function run(executor, sql, params = []) {
   const command = String(sql).trim().toUpperCase();
   if (command === 'BEGIN' || command === 'BEGIN TRANSACTION') {
@@ -56,8 +45,7 @@ async function run(executor, sql, params = []) {
     await executor.rollback();
     return { rows: [], rowCount: 0 };
   }
-  const normalized = normalizeSql(sql, params);
-  const [result] = await executor.execute(normalized.sql, normalized.params);
+  const [result] = await executor.execute(String(sql), params);
   if (Array.isArray(result)) return { rows: result, rowCount: result.length };
   return {
     rows: [],

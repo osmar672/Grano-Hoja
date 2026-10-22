@@ -1,12 +1,13 @@
-# Identidad visual — Raíz & Madera
+# Identidad visual — Grano & Hoja
 
-- Marca: **Raíz & Madera**.
-- Eslogan: **Espacios vivos, hogares con esencia.**
-- Categorías: plantas, muebles y decoración.
-- Paleta: verde bosque, verdes hoja, crema cálido, arena y madera suave.
-- Marca gráfica: `frontend/src/components/LogoMark.jsx` y export estático `frontend/public/raiz-madera-logo.svg`.
-- Estética: editorial, botánica, ligera, con fondos crema, paneles suaves y navegación verde oscuro.
-- Movimiento: entradas sutiles, feedback hover y movimiento de marca; `prefers-reduced-motion` desactiva las animaciones cuando el usuario así lo prefiere.
-- Móvil: navegación fija inferior sin barra de scroll horizontal; las opciones se adaptan al número de opciones autorizadas para el rol.
+- Marca activa: **Grano & Hoja**.
+- Eslogan: **Buen café, buenos ingredientes.**
+- Negocio: cafetería con bebidas calientes/frías y repostería.
+- Paleta: café tostado, crema, verde hoja y terracota suave.
+- Marca gráfica React: `frontend/src/components/LogoMark.jsx`; recurso SVG: `frontend/public/grano-hoja-logo.svg` (taza de café, vapor y hoja).
+- El antiguo SVG se conserva bajo `legacy/frontend/public/` como referencia de la marca anterior.
+- Estética: cálida, limpia y editorial, con fondos crema, paneles suaves y navegación de contraste alto.
+- Movimiento: entradas sutiles y feedback hover; `prefers-reduced-motion` debe desactivar animaciones para quienes lo soliciten.
+- Responsive: el layout adapta la navegación al rol y al ancho; verifica escritorio y móvil antes de publicar.
 
-Prueba en una ventana amplia y en viewport móvil. Verifica con teclado que botones, navegación y formularios mantengan foco visible.
+Verifica contraste, foco visible por teclado, mensajes de error de formularios y navegación a insumos/recetas. El parser JSX confirma sintaxis, pero no sustituye una comprobación visual en un navegador real.

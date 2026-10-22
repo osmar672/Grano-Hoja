@@ -1,4 +1,4 @@
-# SECURITY.md — Raíz & Madera
+# SECURITY.md — Grano & Hoja
 
 Este documento describe la configuración de seguridad para la versión de desarrollo. No equivale a una auditoría independiente ni certifica cumplimiento total de OWASP.
 
@@ -68,7 +68,7 @@ npm run build
 Login de prueba con `curl` puede requerir guardar la cookie, por ejemplo:
 
 ```bash
-curl -i -c cookies.txt -H "Content-Type: application/json" -d '{"email":"admin@raizymadera.local","password":"TU_CLAVE_LOCAL"}' http://localhost:3001/api/auth/login
+curl -i -c cookies.txt -H "Content-Type: application/json" -d '{"email":"admin@granoyhoja.local","password":"TU_CLAVE_LOCAL"}' http://localhost:3001/api/auth/login
 curl -i -b cookies.txt http://localhost:3001/api/productos
 ```
 

@@ -1,57 +1,54 @@
-# Pruebas y defensa — Raíz & Madera
+# Pruebas y defensa — Grano & Hoja
 
-## Checklist funcional
+## Pruebas automáticas
 
-- [ ] `schema.sql` carga en una base de demostración limpia.
-- [ ] Login crea cookie HttpOnly; `/api/auth/me` lee la sesión; logout destruye la sesión.
-- [ ] Sin sesión: `GET /api/productos` devuelve `401`.
-- [ ] Rol `caja`: `POST /api/productos` devuelve `403`.
-- [ ] CRUD de producto funciona con precio, descripción, categoría, stock, mínimo y activo.
-- [ ] Buscar por texto, filtrar categoría y ordenar por nombre/precio/categoría/stock funciona.
-- [ ] Crear venta conserva el precio por línea y calcula 13 % de impuesto.
-- [ ] Confirmar venta con stock suficiente descuenta existencias y pasa a `confirmado`.
-- [ ] Confirmar venta con stock insuficiente devuelve `409` y el stock no cambia.
-- [ ] Confirmar la misma venta dos veces devuelve `409`.
-- [ ] Dos ventas simultáneas que consumen el mismo producto no permiten stock negativo.
-- [ ] Anular pendiente conserva stock; anular confirmada antes de 15 minutos repone stock.
-- [ ] Anular tras 16 minutos devuelve `409`.
-- [ ] Resumen suma solo ventas confirmadas; las anuladas no cuentan.
-- [ ] Reportes de bajo stock y ventas de siete días devuelven productos y cantidades correctas.
-- [ ] El agente solo se llama a través del backend protegido y responde `{ok,data,error}`.
-
-## Comandos
+Desde la carpeta principal:
 
 ```powershell
-cd backend
-npm install
+node scripts/check-vercel.mjs
+node scripts/check-integration.mjs
+Push-Location backend
 npm run check
+npm run check:integration
 npm test
-npm audit
+npm audit --audit-level=moderate
+Pop-Location
+Push-Location frontend
+npm audit --audit-level=moderate
+$env:VITE_API_URL = '/api'
+npm run build
+Pop-Location
 ```
 
-Importa `tests/Raiz-y-Madera.postman_collection.json` en Postman; configura `adminPassword` solo como variable local y ejecuta `Login admin` antes de los endpoints protegidos.
+Estas pruebas de instalación/audit/build se deben ejecutar tras una instalación npm limpia. En la sesión de auditoría, la suite backend pasó 39/39, `check` validó 52 archivos, integración pasó 31/31 y Vercel pasó 20/20. `npm audit` y el build limpio siguen sin verificar porque el registro de npm no era resoluble por DNS; no se reporta un audit limpio.
 
-## Defensa individual
+## Casos funcionales con MySQL real
 
-- **¿Por qué una transacción?** La confirmación cambia varias existencias y estado de venta; si una validación falla, todo debe retroceder.
-- **¿Cómo evita el stock negativo con ventas simultáneas?** Bloquea las filas de producto con `SELECT ... FOR UPDATE` en orden estable, valida disponibilidad después del bloqueo y descuenta antes de hacer `COMMIT`.
-- **¿Por qué guardar `precio_unitario` en `pedido_items`?** Una venta debe conservar el precio en el instante en que se creó, aunque el catálogo cambie después.
-- **¿Cuándo empieza el plazo de anulación?** Desde `fecha_confirmacion`, no desde la creación de la venta pendiente.
-- **¿Por qué la interfaz no define permisos?** Los permisos de verdad se aplican en las rutas Express; ocultar un botón no impide que alguien haga una petición HTTP directa.
-- **¿Cómo funciona el asistente?** n8n consulta reportes read-only y devuelve una recomendación JSON; el flujo no puede cambiar existencias.
+- `schema.sql` solo sobre una base desechable, porque contiene `DROP TABLE`.
+- Insumos: listar, crear, editar, archivar/eliminar conforme a relaciones, stock decimal y mínimo.
+- Recetas: leer y reemplazar; la combinación producto/insumo es única; no debe agregarse insumo inactivo.
+- Ventas: crear pendiente; confirmar con inventario suficiente; confirmar con stock insuficiente y comprobar `409` sin modificación parcial; confirmar dos veces y comprobar `409`.
+- Consumo acumulado: dos líneas/productos con café compartido deben sumar por insumo.
+- Concurrencia: dos pedidos disputan el mismo stock, no debe haber stock negativo.
+- Anulación: pedido pendiente anulado sin devolución; pedido confirmado anulado dentro de 15 minutos restituye los movimientos; anulación repetida o fuera de plazo da `409`.
+- Producto sin receta: vendible sin descuento de ingredientes ni de `productos.stock` legado. Configura recetas para todos los productos cuyo consumo deba registrarse.
+- n8n y OAuth: probarlos solamente con las credenciales e instancias reales del propietario.
 
-## Estado honesto de pruebas
+Los pasos SQL y los contratos exactos están en `tests/README.md` y `tests/smoke.http`. La migración 004, locks, concurrencia y datos reales no se ejecutaron en MySQL en esta sesión.
 
-El proyecto está estructurado para las pruebas listadas, pero se debe ejecutar contra MySQL 8.4 y las dependencias reales en el equipo. No afirmes que se pasó una prueba hasta registrar su resultado observado.
+## Postman
 
+Importa `tests/Grano-Hoja.postman_collection.json` para el flujo principal e `tests/Grano-Hoja-seguridad.postman_collection.json` para roles y seguridad. Define las contraseñas como variables locales de Postman; nunca las guardes en la colección ni en Git.
 
-## Pruebas adicionales de Google OAuth
+## Preguntas de defensa
 
-1. Con `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y el URI exacto configurados en backend, entra a `/login` y pulsa **Crear usuario con Google**.
-2. Autoriza con un usuario de prueba permitido por la pantalla de consentimiento. Debe volver a `/` con sesión activa.
-3. Comprueba en MySQL 8.4 que `google_sub` es único y el nuevo usuario tiene rol `caja`, `password_hash IS NULL` y `active = TRUE`.
-4. Cierra sesión y pulsa **Continuar con Google**; la cuenta registrada debe volver a iniciar sesión.
-5. Intenta registrar la misma cuenta otra vez: debe mostrar mensaje de cuenta existente.
-6. Inicia el login Google con un correo no registrado: debe sugerir el registro.
-7. Cambia state/nonce en una solicitud o usa un callback caducado: el callback debe rechazarlo y no crear una sesión.
-8. Sin credenciales configuradas, la UI debe mostrar que Google OAuth aún no está configurado; el login con contraseña sigue disponible.
+- **¿Por qué una transacción?** Se actualizan varias filas de insumos, movimientos y estado de venta; si cualquier validación falla, todo debe revertirse.
+- **¿Cómo evita stock negativo?** Bloquea las filas de inventario por ID, comprueba stock bajo bloqueo y ejecuta actualizaciones condicionales dentro de una transacción.
+- **¿Qué ocurre si cambia una receta?** La anulación usa el consumo original registrado; no recalcula la cantidad a partir de la receta actual.
+- **¿Cuándo se puede anular?** Solo en los 15 minutos posteriores a confirmar; el plazo se basa en `fecha_confirmacion`.
+- **¿Dónde se aplican permisos?** En las rutas Express además de ocultar enlaces en React; una llamada HTTP directa sigue sujeta a middleware backend.
+- **¿Qué permisos tiene n8n?** El flujo oficial consulta insumos mínimos y reportes de lectura; no escribe directamente a MySQL ni tiene por defecto permiso para descontar stock.
+
+## Estado de evidencia
+
+La sintaxis, los tests unitarios y los checks estáticos indicados arriba sí se ejecutaron con los módulos ya presentes. El build de producción con dependencias declaradas, `npm audit` sin red, migración/transacciones MySQL real, autenticación Google, instancia Vercel y ejecución del workflow n8n permanecen sin verificar; no se deben presentar como pruebas exitosas.

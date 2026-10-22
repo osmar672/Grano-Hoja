@@ -116,7 +116,7 @@ export default function AdminPage() {
   }
 
   return <div className="page-stack admin-page">
-    <section className="botanical-hero admin-hero"><div><span className="eyebrow">ADMINISTRACIÓN · RAÍZ & MADERA</span><h1>Cuida cada raíz del negocio.</h1><p>Gestiona accesos, protege el inventario y revisa las acciones importantes de la tienda desde un solo lugar.</p></div><span className="admin-hero-mark" aria-hidden="true">✿</span></section>
+    <section className="botanical-hero admin-hero"><div><span className="eyebrow">ADMINISTRACIÓN · GRANO & HOJA</span><h1>Cuida cada detalle de la cafetería.</h1><p>Gestiona accesos, controla ingredientes y revisa las operaciones de la cafetería.</p></div><span className="admin-hero-mark" aria-hidden="true">✿</span></section>
 
     {error && <ErrorMessage error={{ message: error, status: 0 }} onRetry={load} />}
     {loading && !overview ? <LoadingState message="Cargando herramientas de administración…" /> : <>
@@ -124,12 +124,12 @@ export default function AdminPage() {
         <MetricCard label="Usuarios activos" value={overview?.active_users ?? '—'} note={`${overview?.inactive_users ?? 0} cuentas desactivadas`} icon="♙" />
         <MetricCard label="Administradores activos" value={overview?.active_admins ?? '—'} note="Debe existir al menos uno" icon="⌑" />
         <MetricCard label="Productos publicados" value={overview?.active_products ?? '—'} note="Catálogo visible en ventas" icon="✿" />
-        <MetricCard label="Stock bajo" value={overview?.low_stock_products ?? '—'} note="Productos al mínimo o agotados" icon="⚑" />
+        <MetricCard label="Insumos bajos" value={overview?.low_stock_ingredients ?? '—'} note="Ingredientes al mínimo o agotados" icon="⚑" />
         <MetricCard label="Ventas de hoy" value={money(overview?.sales_today_total)} note={`${overview?.sales_today_count ?? 0} ventas confirmadas`} icon="↗" />
       </section>
       <section className="admin-quick-actions">
-        <QuickAction to="/productos" icon="✿" title="Gestionar catálogo" description="Crear, editar y mantener productos" />
-        <QuickAction to="/inventario" icon="❋" title="Revisar inventario" description="Detectar existencias por reponer" />
+        <QuickAction to="/productos" icon="✿" title="Gestionar catálogo" description="Crear y mantener bebidas y repostería" />
+        <QuickAction to="/inventario" icon="❋" title="Revisar insumos" description="Detectar ingredientes por reponer" />
         <QuickAction to="/pedidos" icon="↗" title="Consultar ventas" description="Historial, confirmaciones y anulaciones" />
         <QuickAction to="/asistente-compras" icon="✦" title="Asistente de reposición" description="Sugerencias de compra con IA" />
       </section>

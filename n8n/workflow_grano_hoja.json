@@ -21,7 +21,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $json.body ?? $json;\nconst solicitud = typeof body.solicitud === 'string' ? body.solicitud.trim() : '';\nif (!solicitud || solicitud.length > 2000) {\n  const error = !solicitud ? 'El campo solicitud es obligatorio.' : 'La solicitud no puede superar los 2000 caracteres.';\n  return [{ json: { valid: false, error, ok: false, data: null } }];\n}\nreturn [{ json: { valid: true, solicitud } }];"
+        "jsCode": "const body = $json.body ?? $json;\nconst solicitud = typeof body.solicitud === 'string' ? body.solicitud.trim() : '';\nif (!solicitud || solicitud.length > 1000) {\n  const error = !solicitud ? 'El campo solicitud es obligatorio.' : 'La solicitud no puede superar los 1000 caracteres.';\n  return [{ json: { valid: false, error, ok: false, data: null } }];\n}\nlet apiBaseUrl;\ntry {\n  const parsed = new URL(typeof body.apiBaseUrl === 'string' ? body.apiBaseUrl.trim() : '');\n  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) throw new Error('URL no permitida');\n  apiBaseUrl = parsed.origin;\n} catch {\n  return [{ json: { valid: false, error: 'El backend no envió un origen de API válido.', ok: false, data: null } }];\n}\nreturn [{ json: { valid: true, solicitud, apiBaseUrl } }];"
       },
       "id": "gh-validate-002",
       "name": "Validar entrada",
@@ -71,7 +71,7 @@
         "promptType": "define",
         "text": "={{ $json.solicitud }}",
         "options": {
-          "systemMessage": "Eres el asistente de compras de Grano & Hoja, una cafetería en Costa Rica. Debes basarte en los datos reales de la API, nunca inventar stock, mínimos, ventas ni unidades. Usa ambas herramientas disponibles: Insumos bajo mínimo y Reporte de ventas últimos 7 días. Cruza stock actual, stock_minimo, consumo estimado semanal y unidades vendidas. Sugiere compras solo cuando estén justificadas. Cantidad sugerida debe ser numérica y en la misma unidad que la API; usa como objetivo práctico reponer al menos el faltante hasta el mínimo y considera el consumo semanal, sin sugerir cantidades negativas. Devuelve SOLO JSON válido (sin markdown, sin texto antes/después) con esta forma exacta: {\"resumen\":\"resumen breve en español\",\"sugerencias\":[{\"insumo\":\"nombre exacto\",\"cantidad_sugerida\":0,\"unidad\":\"unidad exacta\",\"justificacion\":\"explica stock actual, mínimo y consumo de los últimos 7 días\"}]} Si no hay sugerencias, usa una lista vacía. No ejecutes compras ni modifiques datos. Si una herramienta falla, dilo en el resumen y no inventes cifras."
+          "systemMessage": "Eres el asistente de compras de Grano & Hoja, una cafetería en Costa Rica. Basa cada respuesta únicamente en los resultados reales de las herramientas; nunca inventes existencias, mínimos, ventas ni unidades. Consulta Insumos bajo mínimo, Reporte de ventas últimos 7 días y Consumo por insumo últimos 7 días. Cruza stock actual, stock_minimo, consumo real registrado y unidades vendidas. Sugiere compras solo cuando estén justificadas. La cantidad debe ser numérica y usar exactamente la unidad del insumo. No sugieras cantidades negativas. Devuelve SOLO JSON válido (sin markdown ni texto adicional) con esta forma: {\"resumen\":\"resumen breve en español\",\"sugerencias\":[{\"insumo\":\"nombre exacto\",\"cantidad_sugerida\":0,\"unidad\":\"unidad exacta\",\"justificacion\":\"explica stock actual, mínimo y consumo registrado de los últimos 7 días\"}]}. Si no hay sugerencias, usa una lista vacía. No ejecutes compras ni modifiques datos. Si alguna herramienta falla, indícalo en el resumen y no inventes cifras."
         }
       },
       "id": "gh-agent-004",
@@ -104,9 +104,9 @@
     },
     {
       "parameters": {
-        "toolDescription": "Consulta insumos cuyo stock actual está por debajo de stock_minimo. Usa estos datos para identificar faltantes reales.",
+        "toolDescription": "Consulta insumos reales cuyo stock_actual es inferior a stock_minimo. Usa el nombre, unidad, stock y faltante devueltos por la API.",
         "method": "GET",
-        "url": "http://host.docker.internal:3001/api/insumos/bajo-minimo",
+        "url": "={{ $('Validar entrada').first().json.apiBaseUrl + '/api/insumos/bajo-minimo' }}",
         "options": {},
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
@@ -126,9 +126,9 @@
     },
     {
       "parameters": {
-        "toolDescription": "Obtiene unidades vendidas por producto y consumo estimado de cada insumo en las ventas confirmadas de los últimos siete días.",
+        "toolDescription": "Obtiene unidades vendidas de cada producto en pedidos confirmados de los últimos siete días.",
         "method": "GET",
-        "url": "http://host.docker.internal:3001/api/reportes/ventas-semana",
+        "url": "={{ $('Validar entrada').first().json.apiBaseUrl + '/api/reportes/ventas-semana' }}",
         "options": {},
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
@@ -209,6 +209,28 @@
         1240,
         450
       ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Obtiene el consumo real de cada insumo registrado al confirmar ventas durante los últimos siete días, en su unidad de inventario.",
+        "method": "GET",
+        "url": "={{ $('Validar entrada').first().json.apiBaseUrl + '/api/reportes/consumo-insumos-semana' }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        }
+      },
+      "id": "gh-tool-consumption-012",
+      "name": "Consumo por insumo 7 días",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        1320,
+        610
+      ]
     }
   ],
   "connections": {
@@ -246,24 +268,6 @@
         [
           {
             "node": "Respuesta de validación",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "AI Agent - compras": {
-      "main": [
-        [
-          {
-            "node": "Normalizar respuesta",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Respuesta de error del agente",
             "type": "main",
             "index": 0
           }
@@ -331,6 +335,35 @@
           {
             "node": "Respond to Webhook",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - compras": {
+      "main": [
+        [
+          {
+            "node": "Normalizar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta de error del agente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consumo por insumo 7 días": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent - compras",
+            "type": "ai_tool",
             "index": 0
           }
         ]

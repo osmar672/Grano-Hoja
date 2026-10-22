@@ -1,3 +1,5 @@
+> Documento histórico, escrito cuando el proyecto se llamaba Raíz & Madera.
+
 # Fase 4 — Dependencias, logs y monitoreo
 
 ## Implementado en este cambio

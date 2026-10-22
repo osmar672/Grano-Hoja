@@ -1,95 +1,45 @@
-# Vercel Services — Arquitectura, rutas y bindings
+# Despliegue con Vercel Services — Grano & Hoja
 
-## Configuración final propuesta
+## Arquitectura y rutas
 
-```json
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
-    "backend": {
-      "root": "backend/",
-      "framework": "express",
-      "entrypoint": "index.js",
-      "installCommand": "npm install",
-      "functions": {
-        "index.js": {
-          "maxDuration": 60
-        }
-      }
-    },
-    "frontend": {
-      "root": "frontend/",
-      "framework": "vite",
-      "installCommand": "npm install --include=dev",
-      "buildCommand": "npm run build",
-      "outputDirectory": "dist",
-      "rewrites": [
-        {
-          "source": "/(.*)",
-          "destination": "/index.html"
-        }
-      ]
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": { "service": "backend" }
-    },
-    {
-      "source": "/(.*)",
-      "destination": { "service": "frontend" }
-    }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
-        { "key": "Strict-Transport-Security", "value": "max-age=15552000; includeSubDomains" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob:; object-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests" }
-      ]
-    }
-  ]
-}
+`vercel.json` declara dos servicios en un único proyecto:
+
+- `backend/`: Express, entrypoint `index.js`, maneja `/api/*`.
+- `frontend/`: Vite/React, build `npm run build`, output `dist` y fallback SPA a `index.html`.
+
+El rewrite `/api/(.*)` hacia backend precede al catch-all hacia frontend. React usa `VITE_API_URL` si existe y, por defecto, `/api`. MySQL y n8n son externos; no se declaran bindings entre servicios Vercel para MySQL o n8n: el navegador llama la API pública y Express se comunica con esos proveedores externos.
+
+## Publicación
+
+1. Importa el repositorio completo desde el directorio del proyecto `./`.
+2. Selecciona **Framework Preset: Services**.
+3. No agregues overrides globales para Install Command, Build Command o Output Directory; las instrucciones están en `vercel.json` por servicio.
+4. Añade las variables de `../.env.vercel.example` en Project Settings → Environment Variables, configurando Production/Preview/Development como corresponda.
+5. Prepara MySQL 8 accesible externamente con TLS cuando el proveedor lo requiera, importa `schema.production.sql` en una base nueva y confirma que el usuario MySQL tenga solo los permisos necesarios.
+6. Configura Google Cloud con callback `https://TU_DOMINIO/api/auth/google/callback` y origen de frontend exacto.
+7. Configura n8n por HTTPS: `N8N_WEBHOOK_URL` debe apuntar al webhook oficial activo; `N8N_API_BASE_URL` debe ser el origen público de la API, sin path; los dos tokens deben ser distintos.
+8. Ejecuta `node scripts/check-vercel.mjs` y `node scripts/check-integration.mjs`, luego realiza un deployment de prueba y sigue el checklist en `PRODUCCION.md`.
+
+## Variables exactas para revisar en Vercel
+
+`NODE_ENV`, `SESSION_SECRET`, `SESSION_COOKIE_NAME`, `SESSION_MINUTES`, `TRUST_PROXY_HOPS`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL`, `DB_POOL_MAX`, `SESSION_DB_POOL_MAX`, `PUBLIC_HTTPS_ORIGIN`, `CORS_ORIGIN`, `FRONTEND_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `N8N_WEBHOOK_URL`, `N8N_API_BASE_URL`, `N8N_WEBHOOK_AUTH_TOKEN`, `N8N_API_SERVICE_TOKEN`, `LOGIN_IP_LIMIT`. No definas secretos con prefijo `VITE_`.
+
+`PUBLIC_HTTPS_ORIGIN`, `CORS_ORIGIN` y `FRONTEND_URL` deben concordar con el origen público permitido. `GOOGLE_REDIRECT_URI` debe concordar exactamente con la URI autorizada en Google Cloud. `N8N_API_BASE_URL` debe ser HTTPS en producción y apuntar al dominio del backend público. No reutilices el mismo token para los dos headers.
+
+## Ver logs de `500 FUNCTION_INVOCATION_FAILED`
+
+1. En el Dashboard del proyecto, abre **Logs** desde la navegación lateral.
+2. Filtra `Environment: Production`, `Status Code: 500` y la ruta `/api/health` (o la que falle). Establece el intervalo temporal donde reproduciste el error.
+3. Abre la entrada y revisa los logs de esa invocación, el Request ID y los mensajes `console.error`. Usa el Request ID para correlacionar la misma petición; no compartas cookies o secretos.
+4. Si el fallo ocurrió al construir/publicar, ve a **Deployments → deployment fallido → Build Logs**.
+5. Tras modificar variables, crea un deployment nuevo; los cambios no alteran deployments ya publicados.
+
+Con CLI instalada y enlazada al proyecto:
+
+```powershell
+vercel logs --level error --since 1h
 ```
 
-## Servicios y alcance público
+El backend ahora escribe un evento diagnóstico con el nombre de la variable ausente o el tipo de error de configuración sin imprimir su valor. El error de la captura no demuestra por sí solo que una variable concreta falte; los logs son necesarios para determinarlo.
 
-| Servicio | Nombre en `vercel.json` | Root | Alcance público | Motivo |
-|---|---|---|---|---|
-| Express API | `backend` | `backend/` | `/api/*` | El navegador necesita pedir la API; Express exige sesión/permisos/CSRF según operación. |
-| React SPA | `frontend` | `frontend/` | `/*` excepto `/api/*` | Es la interfaz pública; los datos sensibles se protegen en la API, no ocultando botones solamente. |
-| MySQL | No es un Vercel Service | Proveedor MySQL externo | No público al navegador | Express se conecta usando `DB_HOST`/TLS. |
-| n8n | No es un Vercel Service | n8n externo por HTTPS | Webhook publicado protegido por Header Auth | Express invoca `N8N_WEBHOOK_URL`; n8n llama a los reportes del backend con token de servicio. |
-
-## Por qué no se añaden bindings ahora
-
-Vercel service bindings están destinados a llamadas servidor-a-servidor entre dos servicios declarados dentro del mismo proyecto Vercel. Aquí el frontend es Vite estático y las llamadas se originan en el navegador mediante `/api/*`, no en una función server-side del frontend; el backend llama a MySQL y n8n, que son proveedores externos y no entradas dentro de `services`.
-
-Por esa razón no hay actualmente un binding válido que declarar. No se inventa `FRONTEND_URL` o `BACKEND_URL` generado por Vercel. Para esta arquitectura:
-
-- React usa `VITE_API_URL` no definido en producción, por lo que el cliente recurre a `/api`.
-- El backend utiliza `DB_HOST` y demás variables MySQL.
-- El backend utiliza `N8N_WEBHOOK_URL` y `N8N_API_BASE_URL` de Vercel.
-- n8n accede a `GET /api/reportes/productos-bajo-stock` y `GET /api/reportes/ventas-semana` con `N8N_API_SERVICE_TOKEN`.
-
-Si se añade un tercer servicio server-side (por ejemplo, un worker o una API interna Vercel), debe declararse en `services`, y el servicio que lo invoque debe declarar el binding con los cuatro campos exigidos por Vercel.
-
-## Qué configurar en Vercel
-
-1. Importar el repositorio desde su raíz `./`.
-2. En Framework Preset seleccionar **Services**. Esta característica está en beta y el proyecto/cuenta debe tener acceso.
-3. No rellenar comandos globales de instalación, build o output; esas opciones ya son específicas de cada servicio en `vercel.json`.
-4. Añadir las variables de `.env.vercel.example` en Project Settings → Environment Variables.
-5. Importar `schema.production.sql` en MySQL remoto con TLS.
-6. Añadir la URI de callback de Google con el dominio real: `https://TU_PROYECTO.vercel.app/api/auth/google/callback`.
-7. Configurar credenciales del workflow n8n y usar el dominio Vercel en `N8N_API_BASE_URL`.
-8. Ejecutar `node scripts/check-vercel.mjs` y `node scripts/check-integration.mjs` antes del despliegue.
-
-Referencias oficiales:
-- https://vercel.com/docs/services
-- https://vercel.com/kb/guide/vercel-services
+Referencias oficiales actualizadas: [Runtime Logs](https://vercel.com/docs/logs/runtime), [CLI `vercel logs`](https://vercel.com/docs/cli/logs), [Variables de entorno](https://vercel.com/docs/environment-variables).

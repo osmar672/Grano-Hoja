@@ -1,17 +1,18 @@
 services:
   db:
     image: mysql:8.4
-    container_name: raiz-madera-mysql
+    container_name: grano-hoja-mysql
     restart: unless-stopped
     command: ["--default-time-zone=+00:00"]
     environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-raiz_madera}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-grano_hoja}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Crea .env y define MYSQL_ROOT_PASSWORD}
-      MYSQL_APP_USER: ${MYSQL_APP_USER:-raiz_app}
-      MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD:?Define MYSQL_APP_PASSWORD en el .env raíz}
+      MYSQL_APP_USER: ${MYSQL_APP_USER:-grano_app}
+      MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD:?Define MYSQL_APP_PASSWORD en el archivo .env del proyecto}
       TZ: UTC
     ports:
       - "127.0.0.1:3306:3306"
+    # El nombre del volumen se conserva para reutilizar los datos de instalaciones anteriores.
     volumes:
       - raiz_madera_mysql_data:/var/lib/mysql
       - ./deploy/mysql/00-create-app-user.sh:/docker-entrypoint-initdb.d/00-create-app-user.sh:ro
@@ -25,7 +26,7 @@ services:
 
   n8n:
     image: n8nio/n8n:stable
-    container_name: raiz-madera-n8n
+    container_name: grano-hoja-n8n
     restart: unless-stopped
     ports:
       - "127.0.0.1:5678:5678"
@@ -36,7 +37,7 @@ services:
       N8N_EDITOR_BASE_URL: http://localhost:5678/
       WEBHOOK_URL: http://localhost:5678/
       N8N_SECURE_COOKIE: "false"
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Define N8N_ENCRYPTION_KEY en el .env raíz}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Define N8N_ENCRYPTION_KEY en el archivo .env del proyecto}
       N8N_DIAGNOSTICS_ENABLED: "false"
       N8N_PERSONALIZATION_ENABLED: "false"
       GENERIC_TIMEZONE: America/Costa_Rica

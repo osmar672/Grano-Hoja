@@ -1,42 +1,37 @@
-# Arquitectura — Raíz & Madera
+# Arquitectura — Grano & Hoja
 
-## Modelo de datos
+## Componentes
 
-```mermaid
-erDiagram
-  APP_USERS ||--o{ USER_SESSIONS : autentica
-  PEDIDOS ||--|{ PEDIDO_ITEMS : contiene
-  PRODUCTOS ||--o{ PEDIDO_ITEMS : vendido_en
+- **Frontend:** React + Vite + React Router. Las solicitudes usan `frontend/src/services/api.js` y prefijo `/api`; la sesión se comprueba desde `AuthProvider`.
+- **Backend:** Node.js ES modules + Express, MySQL mediante `mysql2/promise`, `express-session` con almacenamiento MySQL, Zod, Helmet, bcrypt, middleware de roles, CSRF, rate limit y registro de errores.
+- **Datos:** MySQL 8/InnoDB/utf8mb4. `productos` representa los artículos vendibles; `insumos` registra existencias medibles; `recetas` expresa consumo por unidad de producto; `movimientos_inventario` conserva consumos y restituciones.
+- **Agente:** n8n recibe llamadas desde el backend y consulta endpoints protegidos/limitados con un token de servicio. No se conecta directamente a MySQL.
+- **Despliegue:** `vercel.json` define los servicios backend y frontend. MySQL y n8n se consideran servicios externos para Vercel Services. `compose.yaml` y `compose.production.yaml` son alternativas contenerizadas.
 
-  APP_USERS { int id PK string email string password_hash string role boolean active }
-  USER_SESSIONS { string sid PK json sess timestamp expire }
-  PRODUCTOS { int id PK string nombre string descripcion numeric precio string categoria int stock int stock_minimo boolean activo }
-  PEDIDOS { int id PK timestamptz fecha timestamptz fecha_confirmacion string metodo_pago numeric subtotal numeric impuesto numeric total string estado }
-  PEDIDO_ITEMS { int id PK int pedido_id FK int producto_id FK int cantidad numeric precio_unitario }
-```
+## Flujo de una venta
 
-`productos` contiene el inventario unitario: cada unidad corresponde a una planta, pieza de mobiliario u objeto decorativo. Las categorías permitidas son `plantas`, `muebles` y `decoracion`. `pedido_items` conserva el precio histórico para que cambiar el precio del catálogo no altere ventas anteriores.
+1. `POST /api/pedidos` valida productos, precio actual y cantidad, y guarda una venta pendiente con el precio unitario capturado.
+2. `POST /api/pedidos/:id/confirmar` abre una transacción, bloquea el pedido y los productos en orden estable, lee las recetas, suma el consumo de insumos repetidos y bloquea las filas de inventario por ID.
+3. Si falta stock, lanza `AppError` 409 y hace `ROLLBACK`, sin confirmar ni consumir parcialmente. Si hay suficiente, descuenta ingredientes, registra un movimiento por insumo y confirma dentro de la misma transacción.
+4. `POST /api/pedidos/:id/anular` permite anular pedidos pendientes sin restitución. Un pedido confirmado solo se puede anular dentro de 15 minutos; la restitución usa los consumos originales guardados en `movimientos_inventario`, y se protege contra restitución duplicada.
+5. Si un producto no tiene receta, se puede vender, pero no consume ingredientes ni su campo histórico `productos.stock`. Antes de usar el sistema en una cafetería real, asigna recetas a los productos que deban afectar inventario.
 
-## Capas backend
+## Esquema de inventario
 
-- `routes/`: define HTTP methods, sesión, rol y esquema Zod.
-- `controllers/`: conecta entrada/salida HTTP con los servicios.
-- `services/`: validaciones de negocio, consultas parametrizadas y transacciones.
-- `db.js`: pool mysql2/promise.
-- `middleware/`: autentica, autoriza, valida entrada y normaliza errores.
+`insumos`: nombre único, unidad, `stock_actual`, `stock_minimo`, estado y timestamps. `recetas`: par único producto/insumo y cantidad decimal positiva. `movimientos_inventario`: tipo `consumo`, `restitucion` o `ajuste`, cantidad positiva, fecha y referencias al insumo/pedido. Las claves foráneas restringen la eliminación de insumos relacionados con recetas/movimientos.
 
-## Reglas de stock
+La migración `backend/migrations/004_insumos_recetas.sql` es aditiva con respecto a las tablas existentes: crea nuevas tablas y ajusta el CHECK de categorías conservando categorías históricas. Requiere que la estructura previa y la constraint `productos_category_allowed` existan como esperan los esquemas del proyecto. No se ejecutó contra MySQL real durante esta auditoría.
 
-1. Crear una venta genera el estado `pendiente`, captura `precio_unitario` por línea y calcula subtotal, 13 % de impuesto y total.
-2. Confirmar bloquea la venta con `FOR UPDATE`, agrupa cantidades por producto, bloquea productos por ID ascendente con `FOR UPDATE`, valida que las existencias alcancen y descuenta stock en la misma transacción.
-3. Si un producto no existe, está inactivo o el stock no alcanza, la transacción se revierte; los conflictos de negocio devuelven `409`.
-4. Anular un pedido pendiente no altera el stock. Anular una venta confirmada solo es posible hasta 15 minutos desde `fecha_confirmacion`; el stock de todas las líneas se repone dentro de una transacción.
-5. Las ventas anuladas no cuentan en `/api/resumen` ni en el reporte semanal.
+## Roles y seguridad
 
-## Seguridad
+La interfaz oculta enlaces según `frontend/src/auth/permissions.js`, pero el backend valida sesión y roles en cada endpoint. Los cambios de recetas e insumos requieren `admin` o `encargado`; lectura es para roles autorizados. El webhook de n8n y los endpoints de servicio usan tokens dedicados. No almacenes secretos en el workflow JSON, el frontend ni el repositorio.
 
-La autenticación se basa en cookies de sesión server-side almacenadas en MySQL 8.4. El backend vuelve a consultar la cuenta y aplica la matriz de permisos. No se confía en las rutas ocultas del frontend. Los secretos de sesión y del workflow n8n quedan en variables de entorno; las consultas SQL son parametrizadas y el `ORDER BY` dinámico usa una lista blanca.
+El limitador de autenticación usa el almacenamiento en memoria predeterminado. En entornos serverless/multiinstancia, los contadores no se comparten; para una protección distribuida debe añadirse/configurarse un almacén compartido compatible con `express-rate-limit`.
 
-## Agente de reposición
+## Entornos de despliegue
 
-React llama al endpoint protegido `POST /api/agente/sugerencia-compra`. El backend envía la solicitud al webhook privado de n8n con su token. El agente consulta `GET /api/reportes/productos-bajo-stock` y `GET /api/reportes/ventas-semana` usando otro token de lectura. La respuesta debe cumplir `{ ok, data, error }`. El agente sugiere; no crea órdenes ni modifica stock.
+Vercel Services publica `/api/*` mediante rewrite hacia Express y dirige el resto al frontend Vite. El backend requiere acceso a MySQL por TLS cuando corresponda y a n8n si se habilita el agente. `compose.production.yaml` constituye un despliegue alternativo; no se ha verificado en ejecución real desde este entorno.
+
+## Estado verificado
+
+Comprobaciones locales con módulos ya disponibles: sintaxis del backend (52 archivos), 39 pruebas `node:test`, 31 contratos estáticos frontend/backend/n8n, 20 verificaciones de Vercel y análisis de parseo de 34 módulos JSX. La instalación limpia, el build de producción, auditorías online, MySQL real, Vercel, Google OAuth y n8n quedan pendientes por limitaciones del entorno o requerir servicios/credenciales reales.

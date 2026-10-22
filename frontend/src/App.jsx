@@ -13,6 +13,8 @@ import NewOrderPage from './pages/NewOrderPage.jsx';
 import PurchaseAssistantPage from './pages/PurchaseAssistantPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
+import InsumosPage from './pages/InsumosPage.jsx';
+import InsumoFormPage from './pages/InsumoFormPage.jsx';
 
 export default function App() {
   return <Routes>
@@ -21,7 +23,10 @@ export default function App() {
       <Route index element={<DashboardPage />} />
       <Route path="admin" element={<RequireRole roles={[ROLE.ADMIN]}><AdminPage /></RequireRole>} />
       <Route path="productos" element={<ProductsPage />} />
-      <Route path="inventario" element={<ProductsPage inventoryOnly />} />
+      <Route path="insumos" element={<RequireRole roles={[ROLE.ADMIN, ROLE.MANAGER, ROLE.CASHIER]}><InsumosPage /></RequireRole>} />
+      <Route path="insumos/nuevo" element={<RequireRole roles={[ROLE.ADMIN, ROLE.MANAGER]}><InsumoFormPage /></RequireRole>} />
+      <Route path="insumos/:id/editar" element={<RequireRole roles={[ROLE.ADMIN, ROLE.MANAGER]}><InsumoFormPage /></RequireRole>} />
+      <Route path="inventario" element={<Navigate to="/insumos" replace />} />
       <Route path="productos/nuevo" element={<RequireRole roles={[ROLE.ADMIN, ROLE.MANAGER]}><ProductFormPage /></RequireRole>} />
       <Route path="productos/:id/editar" element={<RequireRole roles={[ROLE.ADMIN, ROLE.MANAGER]}><ProductFormPage /></RequireRole>} />
       <Route path="productos/:id" element={<ProductDetailPage />} />

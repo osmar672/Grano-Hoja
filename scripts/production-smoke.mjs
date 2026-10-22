@@ -19,7 +19,7 @@ async function check(name, path, validate) {
     checks.push({ name, ok: false, detail: error.name === 'AbortError' ? 'timeout' : 'no se pudo conectar' });
   }
 }
-await check('Health', '/api/health', (r,b) => r.status === 200 && b.includes('API Raíz & Madera activa'));
+await check('Health', '/api/health', (r,b) => r.status === 200 && b.includes('API Grano & Hoja activa'));
 await check('Readiness + MySQL', '/api/ready', (r,b) => r.status === 200 && b.includes('"database":"ready"'));
 await check('Cabecera X-Content-Type-Options', '/api/health', (r) => r.headers.get('x-content-type-options') === 'nosniff');
 await check('Sin X-Powered-By', '/api/health', (r) => !r.headers.has('x-powered-by'));

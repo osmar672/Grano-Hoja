@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Grano & Hoja API",
+    "name": "Grano & Hoja API - punto de venta, insumos y recetas",
     "_postman_id": "5a7c8510-b1a3-4c55-8d10-85f8eb9c01b1",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "description": "Pruebas base de CRUD, métricas y reglas de negocio. Revisa ids en la respuesta de tu propia API."

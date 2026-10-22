@@ -1,100 +1,46 @@
-# Estado de validación — Raíz & Madera
+# Estado de validación — Grano & Hoja
 
-## Revisiones realizadas al preparar este ZIP
+## Línea base limpia (antes de las reparaciones)
 
-- Se revisó el esquema SQL, las rutas de API y los servicios de inventario/ventas respecto al nuevo dominio.
-- Se incluyó un test de esquemas para categorías, existencias, IDs, login, pagos, validación anti-HTML y autorización por rol.
-- Se comprobaron estructuralmente los JSON del workflow y la colección Postman durante la generación del ZIP.
-- La interfaz React quedó adaptada al catálogo de plantas, muebles y decoración; se revisaron imports relativos y sintaxis JSX/JS con un parser estático.
+Las salidas detalladas de línea base y verificación final se conservan en `audit-results/before/commands.log` y `audit-results/after/commands.log` dentro del repositorio. El intento de instalar dependencias no pudo completarse por un problema de resolución DNS: `curl` devolvió `Could not resolve host: registry.npmjs.org` (código 6). La caché de npm estaba vacía. Node local era `v22.16.0`; Node 24 no estaba instalado.
 
-## Pendiente de verificación en tu computadora
+Con los módulos desactualizados incluidos en el ZIP inicial:
 
-- `npm install`, `npm test`, `npm run check` y `npm run build` con dependencias reales.
-- Arranque de MySQL 8.4, carga de `schema.sql`, sesiones y seed de usuarios.
-- Casos transaccionales simultáneos, stock insuficiente y anulación a los 16 minutos.
-- Importación/ejecución real del workflow con credencial propia de modelo y n8n accesible desde la API.
-- `npm audit`, OWASP ZAP y comprobación de HTTPS/cabeceras al desplegar.
+- `backend/npm run check`: sintaxis correcta.
+- `backend/npm run check:integration`: comprobaciones originales pasaban, pero no detectaban todos los contratos omitidos.
+- `backend/npm test`: 28 correctas, 1 fallida por el PATCH vacío (`backend/tests/validation.test.js`).
+- Audit: no se obtuvo resultado de vulnerabilidades fiable durante la instalación interrumpida; no debe interpretarse como un audit limpio.
+- Build del frontend: falló con los módulos incluidos por discrepancia de versión de Vite (instalado 6.4.5 frente a 8.3.5 declarado), permiso del ejecutable y binario opcional de Rollup ausente en Linux.
+- `scripts/check-vercel.mjs`: 19/20 verificaciones por restos del empaquetado SPA anterior.
 
-Esta documentación no declara una prueba como pasada si no se ejecutó en un entorno funcional.
+## Después de las reparaciones — verificaciones ejecutadas con módulos presentes
 
+| Comando | Resultado observado |
+|---|---|
+| `node scripts/check-vercel.mjs` | 20/20 PASS. |
+| `node scripts/check-integration.mjs` | 33/33 PASS. |
+| `cd backend; npm run check` | Sintaxis verificada en 52 archivos. |
+| `cd backend; npm run check:integration` | 33/33 comprobaciones estáticas PASS. |
+| `cd backend; npm test` | 39/39 pruebas PASS. |
+| Parser Babel para módulos frontend | 34/34 módulos JSX/JS pudieron parsearse. |
+| JSON de workflow n8n y colecciones Postman | parseados correctamente. |
+| Protección de `backend/.env` | Git lo ignora y no está versionado; no se inspeccionó ni se imprimió su contenido durante la verificación final. |
 
-## Actualización: login y registro con Google
+## No verificado en este entorno
 
-- [x] Se añadió flujo OAuth del lado del servidor con `state`, `nonce`, PKCE S256 y verificación de correo/ID token.
-- [x] Se añadieron botones de Google para acceder y crear cuenta en `/login`.
-- [x] Registro nuevo se limita al rol `caja`.
-- [x] Variables de Google documentadas solo en backend `.env.example`.
-- [x] Migración 002 y soporte en `schema.sql` para identificadores Google.
-- [ ] Pendiente: configurar las credenciales OAuth reales en Google Cloud Console y probar el callback en el equipo local; esas credenciales no pueden generarse automáticamente.
+- **Instalación limpia y lockfiles:** los `package-lock.json` de backend y frontend no coinciden todavía completamente con las versiones declaradas en los `package.json` (por ejemplo Vite declarado 8.3.5 frente a 6.4.5 en el lock presente). No se pudo regenerar el grafo de dependencias porque el DNS al registro npm falló. Se cambiaron solo los nombres de paquete; no se ha fingido una instalación reproducible.
+- **`npm audit --audit-level=moderate`:** sin consulta efectiva al registro npm, no hay resultado fiable ni lista definitiva de vulnerabilidades.
+- **Build final Vite con dependencias declaradas:** no verificado por el bloqueo de npm; el intento con `node_modules` incluidos no es una verificación válida de la instalación declarada.
+- **MySQL:** no hay cliente/servidor MySQL disponible. No se aplicó `004_insumos_recetas.sql`, ni se verificaron restricciones, locks, transacciones, rollback o concurrencia reales.
+- **Vercel real:** no hay acceso al proyecto ni a sus variables/logs; solo se revisaron la configuración versionada y los verificadores locales.
+- **Google OAuth real:** no se pudo completar un login/registro con credenciales de Google.
+- **n8n real:** el workflow JSON se parseó y verificó estáticamente; no se importó/ejecutó en una instancia con sus credenciales reales.
+- **PowerShell y empaquetado:** no hay `pwsh` disponible, por lo que `scripts/Empaquetar-Proyecto.ps1` no se ejecutó en este entorno.
 
+## Cómo cerrar estos pendientes
 
-## Actualización — Fase 3 de seguridad (21-10-2026)
-
-- Añadido Helmet, CSP en las respuestas de la API, `Permissions-Policy`, y redirect HTTPS/HSTS condicionado a producción.
-- Añadida protección CSRF sincronizadora para POST/PUT/PATCH/DELETE, validación de Origin y Fetch Metadata; el cliente React adjunta `X-CSRF-Token`.
-- En la revisión del 22-10-2026 se retiraron las plantillas de hosting cruzado que podían quedar con CSP placeholder; la configuración soportada ahora es Caddy + Nginx en un mismo origen HTTPS (ver `docs/PRODUCCION.md`).
-- Verificación local en este entorno: `node --check` para fuentes JS seleccionadas y `node --test tests/security-phase3.test.js`: 5/5 pruebas de la protección CSRF pasaron.
-- Pendiente: instalación integral de dependencias (npm install excedió el tiempo límite en este entorno), compilación Vite, pruebas con MySQL 8.4/navegador, comprobar cabeceras desde el hosting real y configurar TLS/proxy/dominio definitivo.
-
-
-## Actualización — Panel de administración
-
-- Añadida la página React `/admin`, visible solo para el rol `admin`, con resumen, accesos rápidos, gestión de usuarios, filtros, cambio de rol/estado, restablecimiento de contraseñas y actividad reciente.
-- Añadidos `GET /api/admin/overview`, `GET /api/admin/users`, `POST /api/admin/users`, `PATCH /api/admin/users/:id` y `GET /api/admin/audit`; todos detrás de `requireAuth` y `requireRole('admin')`.
-- Añadido `backend/migrations/003_admin_tools.sql` para bases existentes y la tabla `admin_audit_events` a `schema.sql` para instalaciones nuevas. Las acciones de administración se escriben en auditoría dentro de la misma transacción de las operaciones de usuario; catálogo y ventas añaden eventos best-effort sin interrumpir una operación ya confirmada.
-- Se protege la última cuenta admin activa, se bloquea el cambio de rol/estado de la propia cuenta y se evita exponer secretos en los metadatos de auditoría.
-- Verificación ejecutada aquí: `npm run check` validó sintaxis de 43 archivos del backend; `node --test tests/admin-rules.test.js` pasó 3/3; el parser de TypeScript transpuso 30 archivos JS/JSX del frontend sin errores sintácticos; JSON de Postman validado.
-- Pendiente: instalar dependencias para ejecutar la suite completa y el build real de Vite; aplicar la migración en MySQL 8.4 y probar la página/operaciones con una sesión admin real. En este entorno el test conjunto no pudo importar `zod` porque las dependencias npm no están instaladas.
-- La ejecución de `npm test` completa en el entorno de generación se detuvo en `tests/validation.test.js` porque no está instalado el paquete `zod`; los 12 tests ejecutados sin esa dependencia pasaron. Ejecuta `npm install` en backend antes de repetir la suite completa.
-
-
-## Revisión integrada para producción — 2026-10-22
-
-### Correcciones aplicadas en esta revisión
-
-- React y los enlaces de OAuth usan `/api` como URL por defecto; ya no intentan conectarse al `localhost:3001` del navegador del visitante.
-- Vite proxya `/api` a Express durante desarrollo para compartir origen de cookies/CSRF.
-- MySQL 8.4 de desarrollo solo enlaza a `127.0.0.1`; MySQL 8.4 de producción no publica puertos del host.
-- El stack de producción añade Caddy (TLS automático), Nginx no root y Express bajo un único dominio HTTPS.
-- Readiness comprueba MySQL 8.4; healthchecks internos señalan el esquema esperado para no ser redirigidos desde HTTP interno a la URL pública.
-- La configuración de base de datos verifica certificados TLS cuando `DB_SSL=true`; no desactiva `rejectUnauthorized`.
-- El backup cifrado toma los nombres de base y usuario del entorno del contenedor de MySQL 8.4.
-- El workflow de n8n de producción ya no usa `host.docker.internal`; contiene `https://TU_DOMINIO` como marcador explícito que hay que sustituir.
-- Añadido `npm run check:integration` para verificar estáticamente el cableado del frontend, API, proxy HTTPS, base de datos y n8n.
-
-### Verificaciones realizadas en este entorno
-
-- `backend/npm run check`: sintaxis de 43 archivos JavaScript verificada.
-- `backend/npm run check:integration`: 11/11 comprobaciones estáticas correctas.
-- YAML de `compose.yaml`, `compose.production.yaml` y el workflow de GitHub validado por parser YAML disponible.
-- JSON de package manifests válido; `bash -n` pasó para script de backup y script de creación del rol MySQL 8.4.
-- Suite de backend sin dependencias instaladas: 12 pruebas pasaron; `tests/validation.test.js` no pudo cargar `zod` porque la instalación npm agotó el tiempo de espera. No es un resultado de suite completa.
-- No se ejecutaron Docker, MySQL 8.4, build de Vite, OAuth real, n8n o smoke test contra un dominio en este entorno.
-
-### Bloqueos previos a producción
-
-- Crear/guardar los dos `package-lock.json` ejecutando `npm install` en backend y frontend con acceso al registro; revisar el resultado de `npm audit` y versionarlos.
-- Ejecutar pruebas y build de frontend/backend después de instalar dependencias.
-- Configurar dominio DNS, puertos/firewall, credenciales OAuth de producción, workflow y credenciales de n8n, secretos fuertes, bootstrap de usuarios y política de backup/restauración.
-- Ejecutar el smoke test HTTPS y un escaneo OWASP ZAP desde el dominio publicado.
-- `schema.production.sql` crea una base nueva y vacía; no es un script de migración para copiar directamente la base de desarrollo a producción.
-
-
-## Actualización — Migración de PostgreSQL a MySQL y conexión n8n (2026-10-22)
-
-- La versión actual del runtime utiliza `mysql2/promise`, MySQL 8.4 y `express-mysql-session`. Los documentos antiguos que mencionan PostgreSQL describen la base original; no se deben reutilizar `DATABASE_URL`, `pg`, ni los comandos `psql` para la versión actual.
-- `schema.sql` es un esquema de desarrollo con datos de demostración y contiene instrucciones destructivas `DROP TABLE`. `schema.production.sql` crea un esquema vacío y no migra datos de PostgreSQL.
-- La tabla `user_sessions` debe existir antes de aceptar login. Se añadió explícitamente a `schema.production.sql` y `check-integration.mjs` ahora la verifica.
-- n8n no tiene conexión directa a MySQL: React llama a Express; Express llama al webhook protegido; las herramientas del agente consultan los endpoints GET de reportes usando `N8N_API_SERVICE_TOKEN`.
-- Verificación ejecutada: `backend/npm run check` pasó para 44 archivos JS; `backend/npm run check:integration` pasó 18/18 comprobaciones estáticas, incluida la tabla de sesiones; `node --test tests/logger.test.js tests/request-logger.test.js tests/security-phase3.test.js tests/admin-rules.test.js` pasó 12/12.
-- Pendiente: `npm install` agotó el tiempo en este entorno; no se crearon lockfiles. No se ejecutaron MySQL, Docker Compose, el build real de Vite, Google OAuth ni n8n con credenciales reales. Deben probarse en el equipo local.
-
-
-## Actualización — Vercel Services (2026-10-22)
-
-- `vercel.json` define servicios separados `backend` (Express) y `frontend` (Vite), cada uno con root, instalación y build propios.
-- Las rutas de nivel superior envían `/api/*` al servicio `backend` y el resto a `frontend`; el backend conserva el prefijo `/api`.
-- Se retiró la configuración antigua que empaquetaba la SPA dentro de la Function Express y se actualizó la guía `PUBLICAR_EN_VERCEL.md`.
-- El frontend estático usa `/api` del mismo origen. No se declaran bindings Vercel porque la UI llama desde el navegador y las otras dependencias (MySQL y n8n) son externas, no servicios Vercel de este repo.
-- `node scripts/check-vercel.mjs`: 20/20 comprobaciones estáticas correctas. `node scripts/check-integration.mjs`: comprobaciones estructurales correctas.
-- Pendiente: instalar dependencias y ejecutar los builds/tests con la cuenta Vercel real; confirmar que el proyecto tenga habilitado el Framework Preset `Services`, configurar variables privadas en el Dashboard y probar MySQL, OAuth y n8n reales.
+1. En un equipo con Internet y Node 24, ejecuta los comandos de `tests/README.md` y la secuencia CI descrita en `../.github/workflows/security.yml`. Regenera/versiona lockfiles solo después de verificar las versiones resultantes y revisar el diff.
+2. Aplica la migración 004 tras respaldo a una base MySQL compatible y completa el smoke manual de `tests/README.md`.
+3. En Vercel, revisa variables y Runtime Logs según `VERCEL_SERVICES.md`; cambia valores solo desde Settings y crea un deployment nuevo.
+4. Prueba Google OAuth con cuenta de prueba y el callback exacto.
+5. Importa el workflow oficial, crea credenciales Header Auth/modelo y ejecuta una sugerencia desde la UI.

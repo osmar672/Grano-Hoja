@@ -5,7 +5,7 @@ OUT_DIR="${BACKUP_DIR:-./backups}"
 mkdir -p "$OUT_DIR"
 chmod 700 "$OUT_DIR"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-FILE="$OUT_DIR/raiz-madera-${STAMP}.sql.gpg"
+FILE="$OUT_DIR/grano-hoja-${STAMP}.sql.gpg"
 umask 077
 # El dump se produce dentro del contenedor y se cifra en streaming en el host.
 docker compose --env-file .env.production -f compose.production.yaml exec -T db \

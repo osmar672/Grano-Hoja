@@ -10,6 +10,8 @@ const permissions = Object.freeze({
   deleteCatalog: [ROLE.ADMIN],
   purchaseAssistant: [ROLE.ADMIN, ROLE.MANAGER],
   operateOrders: [ROLE.ADMIN, ROLE.MANAGER, ROLE.CASHIER],
+  viewIngredients: [ROLE.ADMIN, ROLE.MANAGER, ROLE.CASHIER],
+  manageIngredients: [ROLE.ADMIN, ROLE.MANAGER],
 });
 
 export function can(user, permission) {

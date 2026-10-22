@@ -1,3 +1,5 @@
+> Documento histórico, escrito cuando el proyecto se llamaba Raíz & Madera.
+
 > **Estado actual del repositorio:** la versión más reciente usa MySQL 8.4 (`mysql2/promise` y `express-mysql-session`). Algunas entradas anteriores de esta bitácora registran la etapa previa con PostgreSQL y se conservan como historial de decisiones, no como instrucciones actuales.
 
 # BITÁCORA DE USO DE IA — Raíz & Madera

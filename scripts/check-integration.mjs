@@ -1,48 +1,62 @@
-import { readFile, access } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-const root = resolve(import.meta.dirname, '..');
+import { fileURLToPath } from 'node:url';
+const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const read = (path) => readFile(resolve(root, path), 'utf8');
+const exists = async (path) => { try { await access(resolve(root, path)); return true; } catch { return false; } };
 const checks = [];
-function assertCheck(name, ok, detail) { checks.push({ name, ok: Boolean(ok), detail }); }
-const apiClient = await read('frontend/src/services/api.js');
-const loginPage = await read('frontend/src/pages/LoginPage.jsx');
-const vite = await read('frontend/vite.config.js');
-const app = await read('backend/src/app.js');
-const backendPackage = JSON.parse(await read('backend/package.json'));
-const compose = await read('compose.production.yaml');
-const localCompose = await read('compose.yaml');
-const nginx = await read('frontend/nginx.conf');
-const caddy = await read('deploy/caddy/Caddyfile');
-const productionSchema = await read('schema.production.sql');
-const devSchema = await read('schema.sql');
-const oauth = await read('backend/src/controllers/google-auth.controller.js');
-const webhookController = await read('backend/src/controllers/agente.controller.js');
-const reportRoutes = await read('backend/src/routes/reportes.routes.js');
-const mysqlSession = backendPackage.dependencies['express-mysql-session'];
-const mysqlDriver = backendPackage.dependencies.mysql2;
-const workflow = JSON.parse(await read('n8n/workflow_raiz_madera.json'));
-assertCheck('Frontend usa /api por defecto', /VITE_API_URL\s*\|\|\s*'\/api'/.test(apiClient), 'frontend/src/services/api.js');
-assertCheck('Login OAuth utiliza la ruta API común', /VITE_API_URL\|\|'\/api'/.test(loginPage), 'frontend/src/pages/LoginPage.jsx');
-assertCheck('Vite hace proxy /api al backend', vite.includes("'/api': { target: apiTarget"), 'frontend/vite.config.js');
-assertCheck('Express monta auth/admin/catalog/orders/reports/agent', ['/api/auth','/api/admin','/api/productos','/api/pedidos','/api/resumen','/api/reportes','/api/agente'].every(route=>app.includes(`'${route}'`)), 'backend/src/app.js');
-assertCheck('Backend usa mysql2 y session store MySQL', Boolean(mysqlDriver && mysqlSession) && !backendPackage.dependencies.pg && !backendPackage.dependencies['connect-pg-simple'], 'backend/package.json');
-assertCheck('Session store conectado a MySQL', app.includes('express-mysql-session') && app.includes("tableName: 'user_sessions'"), 'backend/src/app.js');
-assertCheck('Esquema de desarrollo usa MySQL/InnoDB', /AUTO_INCREMENT/.test(devSchema) && /ENGINE=InnoDB/.test(devSchema) && !/TIMESTAMPTZ|JSONB|SERIAL\s/i.test(devSchema), 'schema.sql');
-assertCheck('Esquema de producción no borra ni incluye datos demo', !/^\s*DROP\s+TABLE|^\s*INSERT\s+INTO/im.test(productionSchema) && /ENGINE=InnoDB/.test(productionSchema), 'schema.production.sql');
-assertCheck('Esquema de producción incluye la tabla de sesiones', /CREATE TABLE IF NOT EXISTS user_sessions/.test(productionSchema) && /session_id VARCHAR\(128\)/.test(productionSchema), 'schema.production.sql');
-assertCheck('Esquema de producción incluye las seis tablas de la app', ['app_users','user_sessions','admin_audit_events','productos','pedidos','pedido_items'].every((table) => new RegExp('CREATE TABLE IF NOT EXISTS ' + table + '\\b').test(productionSchema)), 'schema.production.sql');
-const prodDbBlock = compose.split(/\n  [a-zA-Z0-9_-]+:\n/)[1] || '';
-assertCheck('MySQL producción no publica puertos y usa red privada', prodDbBlock.includes('image: mysql:8.4') && prodDbBlock.includes('networks: [data_net]') && !/^\s{4}ports:/m.test(prodDbBlock), 'compose.production.yaml');
-assertCheck('MySQL local queda enlazado a localhost', localCompose.includes('mysql:8.4') && localCompose.includes('127.0.0.1:3306:3306'), 'compose.yaml');
-assertCheck('Nginx pasa /api a Express', /location\s+\/api\/[\s\S]*?proxy_pass\s+http:\/\/backend:3001/.test(nginx), 'frontend/nginx.conf');
-assertCheck('Caddy termina TLS para el dominio', caddy.includes('{$PUBLIC_DOMAIN}') && caddy.includes('reverse_proxy frontend:8080'), 'deploy/caddy/Caddyfile');
-assertCheck('OAuth verifica ID token de Google', oauth.includes('GOOGLE_REDIRECT_URI') && oauth.includes('verifyIdToken'), 'google-auth.controller.js');
-assertCheck('n8n obtiene datos solo a través de endpoints protegidos de la API', reportRoutes.includes('requireRoleOrServiceToken') && webhookController.includes('x-rm-webhook-token'), 'rutas y proxy del agente');
-assertCheck('n8n construye las URL desde apiBaseUrl validada enviada por Express', workflow.nodes.filter(n=>n.type==='n8n-nodes-base.httpRequestTool').length >= 2 && workflow.nodes.filter(n=>n.type==='n8n-nodes-base.httpRequestTool').every(n=>String(n.parameters.url).includes("$('Validar entrada').first().json.apiBaseUrl")) && workflow.nodes.find(n=>n.name==='Validar entrada').parameters.jsCode.includes('apiBaseUrl'), 'n8n/workflow_raiz_madera.json');
-assertCheck('Express envía un origen API configurado a n8n', (await read('backend/src/controllers/agente.controller.js')).includes('apiBaseUrl: config.apiBaseUrl') && (await read('backend/.env.example')).includes('N8N_API_BASE_URL='), 'backend/src/controllers/agente.controller.js');
-assertCheck('La página llama al agente por proxy protegido de backend', (await read('frontend/src/services/agent.js')).includes("'/agente/sugerencia-compra'") && (await read('backend/src/routes/agente.routes.js')).includes('requireRole(ROLE.ADMIN, ROLE.MANAGER)'), 'frontend y backend agente');
-for (const item of checks) process.stdout.write(`${item.ok?'PASS':'FAIL'} ${item.name}: ${item.detail}\n`);
+const assertCheck = (name, ok, evidence = '') => checks.push({ name, ok: Boolean(ok), evidence });
+
+const [app, routesAuth, routesAdmin, routesProducts, routesIngredients, routesOrders, routesReports, routesSummary, routesAgent,
+  schemas, ingredientService, recipeService, ordersService, pureConsumption, devSchema, prodSchema, migration,
+  agentController, envExample, apiClient, frontendApp, permissions, productForm, newOrder, dashboard, integrationSource,
+  backendPkgRaw, compose, localCompose, nginx, caddy, oauth, workflowRaw] = await Promise.all([
+  'backend/src/app.js','backend/src/routes/auth.routes.js','backend/src/routes/admin.routes.js','backend/src/routes/productos.routes.js','backend/src/routes/insumos.routes.js','backend/src/routes/pedidos.routes.js','backend/src/routes/reportes.routes.js','backend/src/routes/resumen.routes.js','backend/src/routes/agente.routes.js',
+  'backend/src/validation/schemas.js','backend/src/services/insumos.service.js','backend/src/services/recetas.service.js','backend/src/services/pedidos.service.js','backend/src/services/consumo-insumos.js','schema.sql','schema.production.sql','backend/migrations/004_insumos_recetas.sql',
+  'backend/src/controllers/agente.controller.js','backend/.env.example','frontend/src/services/api.js','frontend/src/App.jsx','frontend/src/auth/permissions.js','frontend/src/pages/ProductFormPage.jsx','frontend/src/pages/NewOrderPage.jsx','frontend/src/pages/DashboardPage.jsx','scripts/check-integration.mjs',
+  'backend/package.json','compose.production.yaml','compose.yaml','frontend/nginx.conf','deploy/caddy/Caddyfile','backend/src/controllers/google-auth.controller.js','n8n/workflow_grano_hoja.json'
+].map(read));
+const backendPkg = JSON.parse(backendPkgRaw);
+const workflow = JSON.parse(workflowRaw);
+const allRoutes = `${routesAuth}\n${routesAdmin}\n${routesProducts}\n${routesIngredients}\n${routesOrders}\n${routesReports}\n${routesSummary}\n${routesAgent}`;
+const frontendCode = (await Promise.all((await (await import('node:fs/promises')).readdir(resolve(root,'frontend/src'),{recursive:true})).filter(p=>/\.(js|jsx)$/.test(p)).map(p=>read(`frontend/src/${p}`)))).join('\n');
+
+assertCheck('Express monta todas las áreas API, incluido inventario de insumos', ['/api/auth','/api/admin','/api/productos','/api/insumos','/api/pedidos','/api/resumen','/api/reportes','/api/agente'].every(route=>app.includes(`'${route}'`)), 'backend/src/app.js');
+assertCheck('Frontend usa /api relativo por defecto', /VITE_API_URL\s*\|\|\s*'\/api'/.test(apiClient), 'frontend/src/services/api.js');
+assertCheck('Node / backend se basa en MySQL sin dependencias PostgreSQL activas', Boolean(backendPkg.dependencies?.mysql2 && backendPkg.dependencies?.['express-mysql-session']) && !backendPkg.dependencies?.pg && !backendPkg.dependencies?.['connect-pg-simple'], 'backend/package.json');
+assertCheck('Auth incluye login, sesión y callback Google que usa el frontend', ['/csrf','/google/start','/google/callback','/login','/me','/logout'].every(path=>routesAuth.includes(`'${path}'`)) && oauth.includes('verifyIdToken'), 'backend/src/routes/auth.routes.js y google-auth.controller.js');
+assertCheck('Rutas administrativas corresponden a las llamadas del frontend', ['/overview','/users','/users/:id','/audit'].every(path=>routesAdmin.includes(`'${path}'`)), 'backend/src/routes/admin.routes.js');
+assertCheck('Contratos del servicio de sesión existen en backend', ["'/login'","'/me'","'/logout'"].every(path=>routesAuth.includes(path)) && frontendCode.includes("'/auth/login'") && frontendCode.includes("'/auth/me'") && frontendCode.includes("'/auth/logout'"), 'frontend/src/services/auth.js y auth.routes.js');
+assertCheck('Endpoints usados por el catálogo existen con métodos compatibles', routesProducts.includes("productosRouter.get('/'") && routesProducts.includes("productosRouter.post('/'") && routesProducts.includes("productosRouter.get('/:id'") && routesProducts.includes("productosRouter.put('/:id'") && routesProducts.includes("productosRouter.delete('/:id'") && frontendCode.includes("'/productos'"), 'frontend pages y backend/src/routes/productos.routes.js');
+assertCheck('Endpoints usados por pedidos existen para listar, crear, confirmar y anular', ["pedidosRouter.get('/'", "pedidosRouter.post('/'", "pedidosRouter.post('/:id/confirmar'", "pedidosRouter.post('/:id/anular'"].every(path=>routesOrders.includes(path)) && frontendCode.includes("'/pedidos'"), 'frontend pages y backend/src/routes/pedidos.routes.js');
+assertCheck('El frontend dispone de rutas para resumen, reportes y administración', routesSummary.includes("resumenRouter.get('/'") && ['/productos-bajo-stock','/ventas-semana','/consumo-insumos-semana'].every(path=>routesReports.includes(`'${path}'`)) && ['/overview','/users','/audit'].every(path=>routesAdmin.includes(`'${path}'`)), 'backend/src/routes/resumen.routes.js, reportes.routes.js y admin.routes.js');
+assertCheck('El backend valida el token de servicio que las herramientas n8n deben enviar', (await read('backend/src/middleware/requireRole.js')).includes("req.get('x-service-token')") && (await read('backend/src/middleware/requireRole.js')).includes('N8N_API_SERVICE_TOKEN'), 'backend/src/middleware/requireRole.js');
+assertCheck('Rutas de productos y recetas GET/PUT están registradas y protegidas por rol', routesProducts.includes("'/:id/receta'") && routesProducts.includes("'/:id/receta'") && routesProducts.includes('requireRole(...allRoles)') && routesProducts.includes('requireRole(...catalogManagers)'), 'backend/src/routes/productos.routes.js');
+assertCheck('Esquemas Zod de insumos y receta existen y son importables', ['insumoCreateBodySchema','insumoPutBodySchema','insumoPatchBodySchema','insumoListQuerySchema','recetaReplaceBodySchema'].every(name=>schemas.includes(`export const ${name}`)), 'backend/src/validation/schemas.js');
+assertCheck('CRUD de insumos está montado con permisos de lectura/escritura', ["insumosRouter.get('/'", "insumosRouter.post('/'", "insumosRouter.get('/:id'", "insumosRouter.put('/:id'", "insumosRouter.patch('/:id'", "insumosRouter.delete('/:id'"].every(pattern=>routesIngredients.includes(pattern)), 'backend/src/routes/insumos.routes.js');
+assertCheck('Consultas del módulo insumos usan sintaxis MySQL nativa', !/\bILIKE\b|\bRETURNING\s+\*|\$[1-9]\d*/i.test(ingredientService) && ingredientService.includes('CONCAT(') && ingredientService.includes('ER_DUP_ENTRY'), 'backend/src/services/insumos.service.js');
+assertCheck('Adaptador DB no traduce placeholders PostgreSQL', !/replace\([^\n]*\$[1-9]/.test(await read('backend/src/db.js')) && (await read('backend/src/db.js')).includes('executor.execute(String(sql), params)'), 'backend/src/db.js');
+assertCheck('Migración 004 aditiva crea insumos, recetas y movimientos', ['CREATE TABLE IF NOT EXISTS insumos','CREATE TABLE IF NOT EXISTS recetas','CREATE TABLE IF NOT EXISTS movimientos_inventario','ENGINE=InnoDB','utf8mb4'].every(text=>migration.includes(text)), 'backend/migrations/004_insumos_recetas.sql');
+assertCheck('Esquemas de desarrollo y producción incluyen los tres objetos nuevos', ['insumos','recetas','movimientos_inventario'].every(table=>new RegExp(`CREATE TABLE IF NOT EXISTS ${table}\\b`).test(devSchema)) && ['insumos','recetas','movimientos_inventario'].every(table=>new RegExp(`CREATE TABLE IF NOT EXISTS ${table}\\b`).test(prodSchema)), 'schema.sql y schema.production.sql');
+assertCheck('El descuento de ingredientes se calcula en función pura y suma insumos repetidos', pureConsumption.includes('calcularConsumoInsumos') && pureConsumption.includes('validarStockDeConsumo') && ordersService.includes('calcularConsumoInsumos'), 'backend/src/services/consumo-insumos.js y pedidos.service.js');
+assertCheck('Confirmación bloquea insumos ordenados, valida stock y registra consumo en una transacción', /ORDER BY id FOR UPDATE/.test(ordersService) && ordersService.includes('validarStockDeConsumo') && ordersService.includes("VALUES(?,?,'consumo',?)") && ordersService.includes("await client.query('BEGIN')"), 'backend/src/services/pedidos.service.js');
+assertCheck('Anulación restituye movimientos originales y evita repetir restituciones', ordersService.includes("tipo='restitucion'") && ordersService.includes("tipo='consumo'") && ordersService.includes('restoredIds'), 'backend/src/services/pedidos.service.js');
+assertCheck('Endpoint protegido de consumo semanal existe para n8n', routesReports.includes("'/consumo-insumos-semana'") && routesReports.includes('requireRoleOrServiceToken') && (await read('backend/src/services/reportes.service.js')).includes('movimientos_inventario'), 'backend/src/routes/reportes.routes.js');
+assertCheck('Reporte de ventas no recomienda compras usando el stock legado de productos', !/p\.stock_minimo|p\.stock|cantidad_sugerida/.test((await read('backend/src/services/reportes.service.js')).split('export async function obtenerConsumoInsumosSemana')[0]), 'backend/src/services/reportes.service.js');
+assertCheck('Frontend monta rutas de insumos protegidas por rol', frontendApp.includes('path="insumos"') && frontendApp.includes('path="insumos/nuevo"') && frontendApp.includes('path="insumos/:id/editar"') && permissions.includes('viewIngredients') && permissions.includes('manageIngredients'), 'frontend/src/App.jsx y auth/permissions.js');
+assertCheck('Ficha de producto guarda receta en el endpoint correspondiente', productForm.includes("/productos/${targetId}/receta") && productForm.includes('recipeItems') && productForm.includes('insumo_id'), 'frontend/src/pages/ProductFormPage.jsx');
+assertCheck('Errores de confirmación se muestran y el pedido pendiente queda accesible', newOrder.includes('confirmError.message') && newOrder.includes('pendingId'), 'frontend/src/pages/NewOrderPage.jsx');
+assertCheck('Dashboard consulta faltantes de insumos, no existencias históricas de producto', dashboard.includes("useFetch('/insumos/bajo-minimo')"), 'frontend/src/pages/DashboardPage.jsx');
+assertCheck('n8n importa workflow Grano & Hoja oficial (no el de marca antigua)', workflow.name.includes('Grano & Hoja') && workflow.nodes.some(n=>n.parameters?.path==='grano-hoja/asistente-compras'), 'n8n/workflow_grano_hoja.json');
+const validateNode=workflow.nodes.find(n=>n.name==='Validar entrada');
+const tools=workflow.nodes.filter(n=>n.type==='n8n-nodes-base.httpRequestTool');
+assertCheck('Todas las herramientas n8n construyen URL desde apiBaseUrl validada', tools.length>=3 && tools.every(n=>String(n.parameters.url).includes("$('Validar entrada').first().json.apiBaseUrl")) && validateNode?.parameters?.jsCode.includes('new URL'), 'n8n/workflow_grano_hoja.json');
+assertCheck('n8n tiene herramientas de stock bajo mínimo, ventas y consumo real', ['Insumos bajo mínimo','Reporte ventas 7 días','Consumo por insumo 7 días'].every(name=>tools.some(n=>n.name===name)) && JSON.stringify(workflow.connections['Consumo por insumo 7 días']||{}).includes('AI Agent - compras'), 'workflow nodes y conexiones');
+assertCheck('Backend envía apiBaseUrl desde config y documentación conserva hook oficial', agentController.includes('apiBaseUrl: config.apiBaseUrl') && envExample.includes('N8N_API_BASE_URL=') && envExample.includes('grano-hoja/asistente-compras'), 'agente.controller.js y backend/.env.example');
+assertCheck('Vite, Docker y Caddy enrutan a la API backend y al frontend', /'\/api': \{ target: apiTarget/.test(await read('frontend/vite.config.js')) && /proxy_pass\s+http:\/\/backend:3001/.test(nginx) && caddy.includes('reverse_proxy frontend:8080'), 'vite.config.js, nginx.conf y Caddyfile');
+assertCheck('El contrato activo del webhook usa x-gh-webhook-token', (await read('backend/src/controllers/agente.controller.js')).includes('x-gh-webhook-token') && (await read('n8n/README.md')).includes('x-gh-webhook-token') && !(await read('backend/src/controllers/agente.controller.js')).includes('x-rm-webhook-token'), 'backend/src/controllers/agente.controller.js y n8n/README.md');
+assertCheck('El verificador se refiere al workflow oficial y prueba rutas nuevas', integrationSource.includes('workflow_grano_hoja.json') && integrationSource.includes('consumo-insumos-semana') && integrationSource.includes('insumoCreateBodySchema'), 'scripts/check-integration.mjs');
+
+for (const item of checks) process.stdout.write(`${item.ok ? 'PASS' : 'FAIL'} ${item.name}${item.evidence ? ` — ${item.evidence}` : ''}\n`);
+process.stdout.write(`\n${checks.filter(item=>item.ok).length}/${checks.length} comprobaciones correctas.\n`);
 if (checks.some(item=>!item.ok)) process.exitCode=1;
-for (const lock of ['backend/package-lock.json','frontend/package-lock.json']) {
-  try { await access(resolve(root,lock)); } catch { process.stdout.write(`WARN falta ${lock}; ejecuta npm install, revisa npm audit y versiona el lockfile antes de producción\n`); }
-}

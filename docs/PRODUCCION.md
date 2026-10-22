@@ -1,45 +1,59 @@
-# Despliegue de producción — Raíz & Madera
+# Producción — Grano & Hoja
 
-La ruta de producción soportada en este repositorio es **un único dominio HTTPS** servido por Caddy, con Nginx para la SPA y proxy hacia Express. Esto evita exponer tokens en React y mantiene cookie, CSRF y OAuth en el mismo origen. El frontend se compila con `VITE_API_URL=/api`, nunca con una URL `localhost`.
+## Arquitectura recomendada en Vercel
 
-## Antes de desplegar
+El repositorio utiliza Vercel Services con `backend/` (Express) para `/api/*` y `frontend/` (Vite) para el resto de rutas. MySQL y n8n son servicios externos; deben ser accesibles desde el backend y configurar TLS/firewall según el proveedor. `compose.production.yaml` es una alternativa contenerizada distinta que no se ha validado en ejecución dentro de esta auditoría.
 
-- Servidor Linux con Docker Engine y Docker Compose v2.
-- Un dominio público con registros DNS A/AAAA apuntando al servidor y puertos TCP 80/443 accesibles desde Internet (y UDP 443 opcional para HTTP/3).
-- Credenciales OAuth de Google de tipo Web application con redirect URI `https://TU_DOMINIO/api/auth/google/callback`.
-- Instancia n8n por HTTPS con la credencial Header Auth que usa `x-rm-webhook-token`, más credencial `x-service-token` distinta para las herramientas que consultan la API.
-- Backups, retención de logs y monitorización gestionados por el operador.
+## Variables de producción
 
-## Configuración
+Revisa `.env.production.example` y `scripts/check-production-env.mjs`. Para Vercel, revisa `.env.vercel.example` y configura en **Project → Settings → Environment Variables**:
 
-1. Copia `.env.production.example` a `.env.production`. Ese archivo está ignorado por Git; jamás lo subas.
-2. Genera contraseñas distintas usando `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` para `APP_DB_PASSWORD`, y secretos hex usando `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` para `SESSION_SECRET` y los dos tokens de n8n.
-3. Rellena el dominio sin protocolo en `PUBLIC_DOMAIN`. Configura `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y registra exactamente el callback HTTPS en Google Cloud. El Compose de producción deriva `FRONTEND_URL`, `CORS_ORIGIN`, `PUBLIC_HTTPS_ORIGIN` y `GOOGLE_REDIRECT_URI` automáticamente de `PUBLIC_DOMAIN`. Registra en Google Cloud exactamente `https://TU_DOMINIO/api/auth/google/callback`; `scripts/check-production-env.mjs` valida los secretos, el dominio y los endpoints externos.
-4. Ejecuta desde la raíz: `node scripts/check-production-env.mjs .env.production`.
-5. Despliega: `docker compose --env-file .env.production -f compose.production.yaml up -d --build`.
-6. Crea las cuentas iniciales **una sola vez** en un contenedor temporal de bootstrap: `docker compose --env-file .env.production -f compose.production.yaml --profile bootstrap run --rm seed`. Revisa los logs del comando; no copies credenciales en consola compartida.
-7. En Google Cloud Console añade el callback `https://TU_DOMINIO/api/auth/google/callback` y autoriza las cuentas de test si la app OAuth sigue en modo pruebas.
-8. En `n8n/workflow_raiz_madera.json`, sustituye `https://TU_DOMINIO/api/reportes/...` por el dominio real en ambos nodos HTTP Request Tool, selecciona la credencial Header Auth que envía `x-service-token` con `N8N_API_SERVICE_TOKEN`, y configura el Webhook Header Auth con `x-rm-webhook-token` y `N8N_WEBHOOK_AUTH_TOKEN`. Activa el workflow y copia su Production URL a `N8N_WEBHOOK_URL`.
-9. Comprueba `https://TU_DOMINIO/api/health` y `https://TU_DOMINIO/api/ready`, y ejecuta `BASE_URL=https://TU_DOMINIO node scripts/production-smoke.mjs` desde bash o define `BASE_URL` en PowerShell antes de ejecutar el script.
+- Sesión/origen: `NODE_ENV=production`, `SESSION_SECRET` (mínimo 32 bytes), `SESSION_COOKIE_NAME`, `SESSION_MINUTES`, `TRUST_PROXY_HOPS`, `PUBLIC_HTTPS_ORIGIN`, `CORS_ORIGIN`, `FRONTEND_URL`.
+- MySQL: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL`, `DB_POOL_MAX`, `SESSION_DB_POOL_MAX`. Si el proveedor exige CA, configura `DB_SSL_CA_FILE` mediante un mecanismo seguro compatible con el despliegue.
+- Google OAuth: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (idéntica al callback autorizado en Google Cloud).
+- n8n: `N8N_WEBHOOK_URL`, `N8N_API_BASE_URL`, `N8N_WEBHOOK_AUTH_TOKEN`, `N8N_API_SERVICE_TOKEN` (tokens distintos).
+- Rate limit: `LOGIN_IP_LIMIT`.
 
-## ¿Qué protege el despliegue?
+`SEED_*` se usan por el script local de inicialización/usuarios y no se necesitan en Vercel si no ejecutas allí el script de seed. No uses variables `VITE_*` para secretos: se envían al navegador.
 
-- Caddy gestiona certificados/HTTPS y redirección HTTP a HTTPS.
-- Caddy/Nginx aplican cabeceras de seguridad al frontend y pasan el esquema HTTPS al backend.
-- MySQL 8.4 no publica ningún puerto del host en `compose.production.yaml`.
-- El backend usa una cuenta MySQL 8.4 de aplicación con permisos DML y auto-incrementos, separada del superusuario de bootstrap.
-- Frontend, backend y MySQL 8.4 están en redes de contenedores separadas por función. Los contenedores frontend/backend corren sin root, en filesystem de solo lectura, sin capacidades Linux y con `no-new-privileges`.
-- Sesiones de servidor tienen cookie `Secure` en producción y el backend valida las peticiones mutables con token CSRF.
-- Health liveness `/api/health` y readiness con MySQL 8.4 `/api/ready` son endpoints independientes.
+Las variables de entorno cambiadas en Vercel solo se aplican a deployments nuevos. Revisa **Production**, **Preview** y **Development** por separado según el entorno deseado.
 
-## Backups y restauración
+## Diagnóstico del 500 `FUNCTION_INVOCATION_FAILED`
 
-Requisito: instala `gpg` en el host y elige una frase de cifrado fuerte fuera del repositorio. `BACKUP_PASSPHRASE='...' bash deploy/scripts/backup-mysql.sh` genera un dump MySQL 8.4 cifrado con AES-256. Protege el directorio de backups, cópialo a almacenamiento externo cifrado y prueba una restauración de forma periódica en una base aislada. No guardes la frase junto al backup. La ejecución de backups/restauración debe monitorizarse; el archivo de script por sí solo no constituye un backup probado.
+1. Abre Vercel Dashboard → proyecto → **Logs**. Filtra `Environment=Production`, status `500`, ruta `/api/health` o la ruta que falla, y nivel `error`/`fatal`. Abre la entrada para ver el Request ID y los mensajes de esa invocación.
+2. Para errores de build/instalación, abre **Deployments** → el deployment fallido → **Build Logs**. Los errores de compilación no son lo mismo que una excepción de runtime.
+3. Revisa los mensajes estructurados `config.startup_failed` o errores de configuración; el backend registra el nombre de la variable y el tipo/motivo, nunca su valor.
+4. Confirma las variables de la lista anterior, la URL de MySQL/TLS y el callback de Google. No publiques logs con tokens, cookies o URLs que incluyan credenciales.
+5. Después de cambiar variables, vuelve a desplegar y prueba `GET https://TU_DOMINIO/api/health` y `GET https://TU_DOMINIO/api/ready`. El primero prueba que la función responde; el segundo también comprueba acceso a MySQL.
 
-## Actualizaciones
+También puedes consultar logs recientes mediante Vercel CLI, tras enlazar la CLI al proyecto:
 
-Actualiza imágenes base de forma rutinaria, revisa Dependabot y ejecuta los workflows. Sin `package-lock.json`, `npm install` puede resolver dependencias transitivas distintas entre builds; la primera tarea del equipo al tener acceso al registro npm es ejecutar `npm install` en backend y frontend, comprobar build/pruebas, revisar `npm audit` y versionar los dos lockfiles. No uses `npm audit fix --force` sin probar compatibilidad.
+```powershell
+vercel logs --level error --since 1h
+```
 
-## Limitaciones
+Referencias oficiales: [Runtime Logs](https://vercel.com/docs/logs/runtime), [Vercel CLI logs](https://vercel.com/docs/cli/logs), [Environment Variables](https://vercel.com/docs/environment-variables).
 
-Esta configuración es un punto de despliegue reproducible, no certifica que la infraestructura esté operativa. El operador debe validar DNS, credenciales OAuth/n8n, reglas de firewall, almacenamiento, backups, alertas y escaneos externos (por ejemplo OWASP ZAP) antes de aceptar clientes reales. `schema.production.sql` no contiene productos, ventas ni otros datos de demostración.
+## Datos y migraciones
+
+- `schema.production.sql` se usa únicamente para inicializar una base nueva sin datos demo.
+- Para una base existente, respáldala antes de ejecutar migraciones aditivas. `backend/migrations/004_insumos_recetas.sql` crea insumos, recetas y movimientos y ajusta la restricción de categorías; requiere esquema anterior compatible.
+- No ejecutes `schema.sql` sobre datos de producción: contiene `DROP TABLE` y datos demo.
+- Comprueba restauración de backups, permisos MySQL mínimos y red/TLS antes de abrir el servicio al público.
+
+## Verificación local disponible
+
+```powershell
+node scripts/check-vercel.mjs
+node scripts/check-integration.mjs
+Push-Location backend
+npm run check
+npm test
+Pop-Location
+Push-Location frontend
+$env:VITE_API_URL = '/api'
+npm run build
+Pop-Location
+```
+
+Los chequeos estáticos y las pruebas backend se han ejecutado con los módulos disponibles; la instalación limpia/build online, Vercel real, MySQL real, n8n y Google OAuth requieren verificación en el ambiente de despliegue.

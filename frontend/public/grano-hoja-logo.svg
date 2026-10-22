@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title desc">
+  <title id="title">Grano &amp; Hoja</title>
+  <desc id="desc">Taza de café con vapor y una hoja verde.</desc>
+  <rect x="2" y="2" width="116" height="116" rx="30" fill="#f4eadb"/>
+  <path d="M30 49h49v27a15 15 0 0 1-15 15H45a15 15 0 0 1-15-15V49Z" fill="#6f4630"/>
+  <path d="M79 56h7a11 11 0 0 1 0 22h-8" fill="none" stroke="#6f4630" stroke-width="7" stroke-linecap="round"/>
+  <path d="M43 39c-8-8 7-10 0-19M59 39c-8-8 7-10 0-19M70 41c-5-6 3-8 4-13" fill="none" stroke="#b97745" stroke-width="4" stroke-linecap="round"/>
+  <path d="M59 64c5-18 19-21 31-19-1 15-13 25-31 19Z" fill="#527b57"/>
+  <path d="M59 64 80 49" fill="none" stroke="#f4eadb" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M20 96h71" fill="none" stroke="#b97745" stroke-width="5" stroke-linecap="round"/>
+</svg>
