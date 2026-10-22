@@ -14,7 +14,6 @@ import { adminRouter } from './routes/admin.routes.js';
 import { csrfProtection } from './middleware/csrfProtection.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
-import { generatedSpaHtml } from './generated-spa.js';
 import { getConfiguredOrigins, getPublicHttpsOrigin } from './utils/deploymentOrigin.js';
 
 const sessionSecret = process.env.SESSION_SECRET;
@@ -171,20 +170,6 @@ app.use('/api/resumen', resumenRouter);
 app.use('/api/reportes', reportesRouter);
 app.use('/api/agente', agenteRouter);
 
-// Vercel sirve los assets de public/ desde CDN; esta respuesta HTML atiende rutas directas de React Router.
-// El HTML se genera durante el build y se empaqueta en generated-spa.js para que esté disponible en la Function.
-if (isVercelRuntime) {
-  app.get('*', (req, res, next) => {
-    if (req.path === '/api' || req.path.startsWith('/api/')) return next();
-    // Un asset faltante debe devolver 404, no el HTML SPA con el MIME equivocado.
-    if (req.path.startsWith('/assets/') || /\.[a-z0-9]{1,10}$/i.test(req.path)) return next();
-    if (req.method !== 'GET' || !req.accepts('html')) return next();
-    if (typeof generatedSpaHtml !== 'string' || !generatedSpaHtml.startsWith('<!doctype html')) {
-      return res.status(503).type('text').send('La interfaz no está compilada. Revisa el buildCommand de Vercel.');
-    }
-    return res.status(200).set('Cache-Control', 'no-store').type('html').send(generatedSpaHtml);
-  });
-}
-
+// El frontend se sirve en el servicio Vercel `frontend`; este Express solo responde a rutas /api.
 app.use(notFound);
 app.use(errorHandler);

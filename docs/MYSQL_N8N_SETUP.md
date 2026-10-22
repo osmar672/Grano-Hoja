@@ -86,9 +86,9 @@ Abre `http://localhost:5173`. El frontend usa rutas relativas `/api`, con Vite p
 
 ### URL de las herramientas
 
-En Windows con Docker Desktop, los dos nodos de herramienta usan `http://host.docker.internal:3001/api/reportes/...`; esto permite al contenedor n8n consultar el backend que corre en el host. Si ejecutas todo en una única red Docker, la URL se cambia al nombre interno del servicio, por ejemplo `http://backend:3001/api/reportes/...`.
+El workflow no guarda una URL fija para los dos nodos HTTP Request Tool. Express envía `apiBaseUrl` al Webhook desde `N8N_API_BASE_URL`; el nodo `Validar entrada` valida que sea un origen HTTP/HTTPS sin credenciales, path, query o fragmento, y las herramientas construyen sus rutas desde ese origen.
 
-Para producción, usa una instancia de n8n accesible por HTTPS y cambia las URLs de los dos nodos HTTP Tool a `https://TU_DOMINIO/api/reportes/productos-bajo-stock` y `https://TU_DOMINIO/api/reportes/ventas-semana`. Pon `N8N_WEBHOOK_URL=https://TU_N8N_DOMINIO/webhook/raiz-madera/asistente-compras` en el backend. No expongas el editor de n8n sin autenticación y protección de red.
+En Windows con Docker Desktop configura `N8N_API_BASE_URL=http://host.docker.internal:3001` en `backend/.env`. Para Vercel configura `N8N_API_BASE_URL=https://TU_PROYECTO.vercel.app`. En producción usa n8n accesible por HTTPS y `N8N_WEBHOOK_URL=https://TU_N8N_DOMINIO/webhook/raiz-madera/asistente-compras` en el backend. No expongas el editor n8n sin autenticación y protección de red.
 
 ## 5. Probar integración
 

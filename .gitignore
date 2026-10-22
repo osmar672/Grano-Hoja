@@ -21,5 +21,3 @@ cookies.txt
 # Producción: incluye contraseñas, sesiones, OAuth y tokens de servicio.
 .env.production
 
-# Built static assets copied for Vercel deployment. Generated during vercel-build.
-/public/

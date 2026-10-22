@@ -59,6 +59,7 @@ Set-Value $backendLines 'DB_NAME' 'raiz_madera'
 Set-Value $backendLines 'DB_PASSWORD' $appPassword
 Set-Value $backendLines 'DB_SSL' 'false'
 Set-Value $backendLines 'N8N_WEBHOOK_URL' 'http://localhost:5678/webhook/raiz-madera/asistente-compras'
+Set-Value $backendLines 'N8N_API_BASE_URL' 'http://host.docker.internal:3001'
 Set-Value $backendLines 'FRONTEND_URL' 'http://localhost:5173'
 Set-Value $backendLines 'GOOGLE_REDIRECT_URI' 'http://localhost:3001/api/auth/google/callback'
 Set-Value $backendLines 'GOOGLE_CLIENT_ID' '96532736729-eafj3lgl17g04g7ubg9cdee3h6qjf15j.apps.googleusercontent.com'

@@ -1,96 +1,93 @@
-# Publicar Raíz & Madera en Vercel
+# Publicar Raíz & Madera usando Vercel Services
 
-Este repositorio está preparado como **un único proyecto Vercel desde la raíz**. No importes únicamente `frontend/` o `backend/`: el archivo raíz `vercel.json`, el `package.json` raíz, `index.js` y `scripts/prepare-vercel-public.mjs` conectan el build de React con la función Express.
+Esta versión utiliza dos servicios Vercel dentro de un único proyecto: `backend` (Express) y `frontend` (Vite/React). La configuración principal es `vercel.json` en la raíz del repositorio.
 
-## 1. Antes de importar
+## 1. Requisitos
 
-1. Sube esta carpeta completa a GitHub, con `vercel.json` en el primer nivel del repositorio.
-2. No subas archivos `.env`, secretos OAuth ni tokens de n8n.
-3. Debes tener MySQL 8 accesible de forma remota con TLS. Vercel no puede acceder a un MySQL que esté en `localhost` o solo en tu computadora.
-4. Debes tener n8n accesible por HTTPS para que funcione el asistente.
+- Repositorio Git con este proyecto completo y `vercel.json` en la raíz.
+- Acceso a Vercel Services (beta) y opción **Framework Preset: Services** en el proyecto.
+- MySQL 8 accesible remotamente con TLS. No puede estar únicamente en `localhost` o dentro del Docker local.
+- n8n accesible por HTTPS con el workflow importado y sus credenciales privadas configuradas.
+- Dominio asignado por Vercel para completar OAuth y variables de entorno después del primer despliegue.
 
-## 2. Importar
+## 2. Importar el repositorio
 
-En https://vercel.com/new selecciona el repositorio y elige la entrada del **directorio raíz** `Raiz-Madera (root/raíz)`. No selecciones el subproyecto `frontend` ni `backend`: este bundle publica React y Express juntos bajo el mismo dominio.
+1. Sube el contenido completo de la carpeta `Raiz-y-Madera` a GitHub.
+2. En Vercel, importa el repositorio como proyecto desde el directorio raíz `./`.
+3. En **Settings → Build and Deployment → Framework Preset**, selecciona **Services**. No selecciones solo Vite, Express, `frontend/` ni `backend/` como proyecto raíz.
+4. Deja que `vercel.json` controle las órdenes de instalación y build por servicio. No agregues overrides globales de `Build Command`, `Install Command`, `Output Directory` o `Framework` en la raíz.
+5. Publica el proyecto. La primera compilación debe construir ambos servicios de forma independiente.
 
-Configura:
+## 3. Enrutamiento público
 
-- Root Directory: `./` (raíz del repositorio).
-- Install Command: `npm install --include=dev`.
-- Build Command: `npm run vercel-build`.
-- Output Directory: dejar vacío.
-- Node.js: una versión compatible con Node `>=22.12.0` (recomendado Node 22 LTS si aparece disponible en el proyecto).
+La configuración expone:
 
-El `vercel.json` ya define el comando de build, instalación, duración de la función y cabeceras. Si el Dashboard detecta automáticamente estos valores, conserva los valores del archivo.
+- `frontend` en `/*` (web pública; las páginas que requieren sesión siguen protegidas por la aplicación).
+- `backend` solo en `/api/*` (API pública necesaria para el navegador, protegida con sesión, roles, validación y CSRF según el endpoint).
 
-## 3. Variables de entorno
+Las reglas aparecen en ese orden: `/api/(.*)` debe ir antes de `/(.*)`. El backend conserva el prefijo `/api`, coherente con sus routers Express.
 
-En Vercel → Project → Settings → Environment Variables, crea las variables descritas en `.env.vercel.example`. Como mínimo:
+## 4. Binding de Vercel Services
+
+En esta arquitectura no se declaran bindings de servicio porque no existe una llamada privada server-to-server entre dos servicios Vercel:
+
+- El frontend Vite es estático; el navegador llama al mismo dominio mediante `/api/*`. Las URLs de binding no están disponibles en código JavaScript estático ejecutado en el navegador.
+- El backend llama a MySQL, una base de datos externa, por `DB_HOST` y variables relacionadas.
+- El backend llama a n8n, una instancia externa, por `N8N_WEBHOOK_URL`.
+- n8n llama a los reportes protegidos por HTTPS usando `N8N_API_BASE_URL` y `N8N_API_SERVICE_TOKEN`.
+
+No añadimos un binding ficticio. Si más adelante se crea una API interna como otro servicio Vercel server-side, ese servicio debe definirse en `services` y el caller podrá usar el binding correspondiente.
+
+## 5. Variables de entorno
+
+En Vercel → Project → Settings → Environment Variables configura los campos de `.env.vercel.example`. Cambia todos los valores de ejemplo por valores reales. Variables principales:
 
 - `NODE_ENV=production`
-- `SESSION_SECRET`: secreto aleatorio nuevo de al menos 32 bytes.
-- `TRUST_PROXY_HOPS=1`
-- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL=true`.
-- `DB_POOL_MAX=2` y `SESSION_DB_POOL_MAX=2`.
-- `PUBLIC_HTTPS_ORIGIN=https://TU_PROYECTO.vercel.app`
-- `CORS_ORIGIN=https://TU_PROYECTO.vercel.app`
-- `FRONTEND_URL=https://TU_PROYECTO.vercel.app`
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`.
-- `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_AUTH_TOKEN`, `N8N_API_SERVICE_TOKEN`.
+- `SESSION_SECRET`, `SESSION_COOKIE_NAME`, `SESSION_MINUTES`, `TRUST_PROXY_HOPS`
+- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL=true`, `DB_POOL_MAX=2`, `SESSION_DB_POOL_MAX=2`
+- `PUBLIC_HTTPS_ORIGIN`, `CORS_ORIGIN`, `FRONTEND_URL` con la misma URL de producción
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
+- `N8N_WEBHOOK_URL`, `N8N_API_BASE_URL`, `N8N_WEBHOOK_AUTH_TOKEN`, `N8N_API_SERVICE_TOKEN`
 
-No uses placeholders al publicar. Define los valores reales dentro del Dashboard, nunca en Git. Para producción, usa un secreto OAuth nuevo si uno anterior fue compartido.
+No agregues valores secretos a `vercel.json`, al código frontend ni al repositorio. Si el secreto OAuth anterior se compartió, revócalo y crea uno nuevo.
 
-## 4. MySQL
+## 6. Base de datos MySQL
 
-Importa `schema.production.sql` a una base MySQL remota vacía. No uses `schema.sql` de desarrollo para una base de datos con información real, porque contiene datos de ejemplo e instrucciones de reinicio. Crea un usuario de aplicación con permisos limitados, TLS habilitado y acceso de red desde Vercel.
+Importa `schema.production.sql` en una base remota vacía. No ejecutes `schema.sql` sobre una base productiva: contiene datos demo y pasos para reiniciar tablas. El proveedor MySQL debe exigir TLS y permitir conexiones desde Vercel. Un usuario de aplicación con permisos mínimos debe tener acceso a las tablas necesarias, incluida `user_sessions`.
 
-Inicializa las cuentas desde un entorno local confiable conectado a la base remota y usando `backend/.env` protegido:
+Después crea las cuentas iniciales una sola vez desde un equipo de confianza, con variables locales protegidas y conexión a la base remota, siguiendo `docs/PRODUCCION.md`.
 
-```bash
-cd backend
-npm install
-npm run users:seed
-```
+## 7. Google OAuth
 
-No ejecutes la creación inicial repetidamente sin revisar las contraseñas y cuentas objetivo.
+Después de la primera publicación, copia el dominio asignado (ej. `https://tu-proyecto.vercel.app`) y actualiza el cliente OAuth de tipo Web:
 
-## 5. Google OAuth
+- Authorized JavaScript origin: `https://tu-proyecto.vercel.app`
+- Authorized redirect URI: `https://tu-proyecto.vercel.app/api/auth/google/callback`
+- `GOOGLE_REDIRECT_URI` en Vercel debe coincidir exactamente.
 
-Después de que Vercel asigne una URL, en Google Cloud Console, cliente OAuth de tipo Web:
+Añade tu cuenta a la lista de Test users si la pantalla de consentimiento aún está en modo de pruebas y vuelve a desplegar después de cambiar las variables.
 
-- Authorized JavaScript origin: `https://TU_PROYECTO.vercel.app`
-- Authorized redirect URI: `https://TU_PROYECTO.vercel.app/api/auth/google/callback`
+## 8. n8n
 
-Usa exactamente el mismo valor para `GOOGLE_REDIRECT_URI` en Vercel. Si cambias dominio o usas un dominio personalizado, actualiza también estas entradas y redepliega.
+Importa `n8n/workflow_raiz_madera.json` en n8n Cloud o un servidor HTTPS independiente. Configura Header Auth en el Webhook (`x-rm-webhook-token` = `N8N_WEBHOOK_AUTH_TOKEN`), Header Auth en las herramientas (`x-service-token` = `N8N_API_SERVICE_TOKEN`) y credencial real en el nodo del modelo. Configura `N8N_WEBHOOK_URL` con la Production URL y `N8N_API_BASE_URL` con el dominio Vercel.
 
-## 6. n8n
+Express envía a n8n la URL base configurada; los nodos HTTP Request Tool construyen los endpoints desde la entrada validada. No pegues credenciales en el JSON del workflow.
 
-Importa `n8n/workflow_raiz_madera.json` en n8n Cloud o una instancia HTTPS pública. Asigna la credencial del proveedor de IA. Configura el Webhook con Header Auth `x-rm-webhook-token` igual a `N8N_WEBHOOK_AUTH_TOKEN`; las herramientas HTTP deben usar otra credencial Header Auth `x-service-token` igual a `N8N_API_SERVICE_TOKEN`.
+## 9. Comprobaciones antes de producción
 
-Cambia las URL locales de herramientas por las rutas reportes reales documentadas en `backend/src/routes/reportes.routes.js`. Copia la Production URL del webhook a `N8N_WEBHOOK_URL` en Vercel y crea un nuevo deployment.
-
-## 7. Probar tras publicar
-
-- `https://TU_PROYECTO.vercel.app/` muestra la aplicación.
-- `https://TU_PROYECTO.vercel.app/login` carga también al recargar (React Router).
-- `https://TU_PROYECTO.vercel.app/api/health` responde JSON `ok: true`.
-- `https://TU_PROYECTO.vercel.app/api/ready` responde `database: ready`.
-- Prueba login tradicional y Google, CRUD según rol, CSRF, ventas, devolución por cancelación y asistente n8n.
-
-Si una ruta `/api` devuelve HTML, revisa que hayas importado la raíz correcta y que el build generado haya terminado. Si `/api/ready` falla, revisa host/credenciales/TLS/permisos de MySQL. Si Google falla, compara el callback exacto. Si n8n falla, revisa la Production URL y ambas credenciales Header Auth.
-
-## 8. Comprobación antes de subir
-
-Ejecuta desde esta carpeta:
+Desde la raíz del repo:
 
 ```bash
-node -e "JSON.parse(require('fs').readFileSync('vercel.json','utf8')); console.log('vercel.json válido')"
-npm install
-npm run check:vercel
-npm run vercel-build
-npm run check:integration
-npm --workspace raiz-madera-api run check
-npm --workspace raiz-madera-api test
+node scripts/check-vercel.mjs
+node scripts/check-integration.mjs
 ```
 
-La compilación y las pruebas deben terminar correctamente antes de tratar el deployment como listo. Vercel no puede probar tus credenciales privadas ni la disponibilidad de tu MySQL/n8n por adelantado.
+Cuando las dependencias estén instaladas, ejecuta también `npm test` en backend y `npm run build` en frontend. Tras publicar, prueba:
+
+- `https://TU_PROYECTO.vercel.app/`
+- `https://TU_PROYECTO.vercel.app/login` después de refrescar la página
+- `https://TU_PROYECTO.vercel.app/api/health`
+- `https://TU_PROYECTO.vercel.app/api/ready`
+- Google OAuth, sesiones/CSRF, permisos por rol, CRUD, pedidos y agente n8n
+
+Vercel Services está en beta y requiere el Framework Preset `Services`. Si no aparece, revisa si tu cuenta/proyecto tiene acceso habilitado. El ZIP no se considera listo para producción hasta que los tests y las conexiones reales pasan.

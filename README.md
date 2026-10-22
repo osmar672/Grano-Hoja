@@ -125,11 +125,13 @@ npm run audit
 
 Importa `tests/Raiz-y-Madera.postman_collection.json` en Postman para las pruebas API. Consulta `docs/RELEASE_CHECKLIST.md`, `docs/PRODUCCION.md` y `SECURITY.md` antes de publicar. Para producción necesitas dominio/DNS, secretos diferentes, OAuth autorizado en HTTPS, n8n accesible mediante HTTPS, backup cifrado probado y escaneos de seguridad. `compose.production.yaml` no expone MySQL en el host.
 
-## Desplegar en Vercel
+## Desplegar en Vercel Services
 
-Ejecuta `npm run check:vercel` para revisar la configuración específica de Vercel antes de publicar.
+Ejecuta `node scripts/check-vercel.mjs` para revisar la configuración y `node scripts/check-integration.mjs` para comprobar el cableado antes de publicar.
 
-Para una versión de un solo proyecto Vercel (Express como Function + frontend Vite en `public/`), revisa [`docs/VERCEL.md`](docs/VERCEL.md). La raíz del proyecto debe ser `./`, y el build genera los assets estáticos. Vercel **no aloja MySQL ni n8n**: necesitas servicios externos HTTPS/TLS y configurar las variables de entorno en el panel. No subas archivos `.env`.
+Esta versión usa Vercel Services con `backend` y `frontend`: el rewrite `/api/*` dirige a Express, y el catch-all dirige las demás rutas a React. En Vercel selecciona **Framework Preset: Services** y root directory `./`. La guía vigente está en [`PUBLICAR_EN_VERCEL.md`](PUBLICAR_EN_VERCEL.md) y [`docs/VERCEL_SERVICES.md`](docs/VERCEL_SERVICES.md).
+
+MySQL y n8n siguen siendo servicios externos, por eso requieren URL accesible, TLS y variables propias. No se declaran bindings internos en esta arquitectura: el navegador llama a `/api/*` por el rewrite público, Express llama a MySQL/n8n externos. No subas archivos `.env`.
 
 ## Carpetas principales
 
@@ -153,4 +155,4 @@ Los datos de ejemplo son ficticios. Para ventas reales, define política de priv
 
 ## Publicación en Vercel
 
-Usa el archivo **`PUBLICAR_EN_VERCEL.md`**. Este proyecto se importa desde el directorio raíz como una sola aplicación: React se compila y se empaqueta junto con la API Express. No importes únicamente `frontend/` ni `backend/`. MySQL y n8n deben estar alojados externamente y configurados mediante variables de entorno de Vercel.
+Usa **`PUBLICAR_EN_VERCEL.md`**. Esta versión utiliza Vercel Services con `frontend` en `/*` y `backend` en `/api/*`. En la configuración de Vercel selecciona Framework Preset `Services` y root `./`. MySQL y n8n son dependencias externas configuradas mediante variables de entorno; actualmente no se declaran bindings internos porque no hay llamadas server-to-server entre servicios Vercel.

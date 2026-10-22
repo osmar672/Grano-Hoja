@@ -1,9 +1,11 @@
 import { logInfo, logWarn } from '../utils/logger.js';
+import { getPublicHttpsOrigin } from '../utils/deploymentOrigin.js';
 
 function getConfiguredWebhook() {
   const configuredUrl = process.env.N8N_WEBHOOK_URL;
   const token = process.env.N8N_WEBHOOK_AUTH_TOKEN;
-  if (!configuredUrl || !token || Buffer.byteLength(token) < 32) return null;
+  const configuredApiBase = process.env.N8N_API_BASE_URL || getPublicHttpsOrigin() || (process.env.NODE_ENV === 'production' ? '' : 'http://host.docker.internal:3001');
+  if (!configuredUrl || !token || Buffer.byteLength(token) < 32 || !configuredApiBase) return null;
 
   let target;
   try {
@@ -14,7 +16,12 @@ function getConfiguredWebhook() {
   if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password) return null;
   const localHosts = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
   if (process.env.NODE_ENV === 'production' && (target.protocol !== 'https:' || localHosts.has(target.hostname))) return null;
-  return { target: target.toString(), token };
+
+  let apiBase;
+  try { apiBase = new URL(configuredApiBase); } catch { return null; }
+  if (!['http:', 'https:'].includes(apiBase.protocol) || apiBase.username || apiBase.password || apiBase.pathname !== '/' || apiBase.search || apiBase.hash) return null;
+  if (process.env.NODE_ENV === 'production' && (apiBase.protocol !== 'https:' || localHosts.has(apiBase.hostname))) return null;
+  return { target: target.toString(), token, apiBaseUrl: apiBase.origin };
 }
 
 export async function sugerenciaCompra(req, res) {
@@ -33,7 +40,9 @@ export async function sugerenciaCompra(req, res) {
         'content-type': 'application/json',
         'x-rm-webhook-token': config.token,
       },
-      body: JSON.stringify({ solicitud: req.body.solicitud }),
+      // El backend aporta la URL de la API; nunca se acepta una URL proporcionada por el navegador.
+      // n8n usa este origen para llamar a los endpoints protegidos, sin localhost fijo en el workflow.
+      body: JSON.stringify({ solicitud: req.body.solicitud, apiBaseUrl: config.apiBaseUrl }),
       signal: controller.signal,
     });
     const payload = await response.json().catch(() => null);

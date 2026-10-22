@@ -88,3 +88,13 @@ Esta documentación no declara una prueba como pasada si no se ejecutó en un en
 - n8n no tiene conexión directa a MySQL: React llama a Express; Express llama al webhook protegido; las herramientas del agente consultan los endpoints GET de reportes usando `N8N_API_SERVICE_TOKEN`.
 - Verificación ejecutada: `backend/npm run check` pasó para 44 archivos JS; `backend/npm run check:integration` pasó 18/18 comprobaciones estáticas, incluida la tabla de sesiones; `node --test tests/logger.test.js tests/request-logger.test.js tests/security-phase3.test.js tests/admin-rules.test.js` pasó 12/12.
 - Pendiente: `npm install` agotó el tiempo en este entorno; no se crearon lockfiles. No se ejecutaron MySQL, Docker Compose, el build real de Vite, Google OAuth ni n8n con credenciales reales. Deben probarse en el equipo local.
+
+
+## Actualización — Vercel Services (2026-10-22)
+
+- `vercel.json` define servicios separados `backend` (Express) y `frontend` (Vite), cada uno con root, instalación y build propios.
+- Las rutas de nivel superior envían `/api/*` al servicio `backend` y el resto a `frontend`; el backend conserva el prefijo `/api`.
+- Se retiró la configuración antigua que empaquetaba la SPA dentro de la Function Express y se actualizó la guía `PUBLICAR_EN_VERCEL.md`.
+- El frontend estático usa `/api` del mismo origen. No se declaran bindings Vercel porque la UI llama desde el navegador y las otras dependencias (MySQL y n8n) son externas, no servicios Vercel de este repo.
+- `node scripts/check-vercel.mjs`: 20/20 comprobaciones estáticas correctas. `node scripts/check-integration.mjs`: comprobaciones estructurales correctas.
+- Pendiente: instalar dependencias y ejecutar los builds/tests con la cuenta Vercel real; confirmar que el proyecto tenga habilitado el Framework Preset `Services`, configurar variables privadas en el Dashboard y probar MySQL, OAuth y n8n reales.

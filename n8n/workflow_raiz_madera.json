@@ -21,7 +21,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $json.body ?? $json;\nconst solicitud = typeof body.solicitud === 'string' ? body.solicitud.trim() : '';\nif (!solicitud || solicitud.length > 2000) {\n  const error = !solicitud ? 'El campo solicitud es obligatorio.' : 'La solicitud no puede superar los 2000 caracteres.';\n  return [{ json: { valid: false, error, ok: false, data: null } }];\n}\nreturn [{ json: { valid: true, solicitud } }];"
+        "jsCode": "const body = $json.body ?? $json;\nconst solicitud = typeof body.solicitud === 'string' ? body.solicitud.trim() : '';\nif (!solicitud || solicitud.length > 2000) {\n  const error = !solicitud ? 'El campo solicitud es obligatorio.' : 'La solicitud no puede superar los 2000 caracteres.';\n  return [{ json: { valid: false, error, ok: false, data: null } }];\n}\nlet apiBaseUrl;\ntry {\n  const parsed = new URL(typeof body.apiBaseUrl === 'string' ? body.apiBaseUrl.trim() : '');\n  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) {\n    throw new Error('URL no permitida');\n  }\n  apiBaseUrl = parsed.origin;\n} catch {\n  return [{ json: { valid: false, error: 'El backend no envió un origen de API válido.', ok: false, data: null } }];\n}\nreturn [{ json: { valid: true, solicitud, apiBaseUrl } }];"
       },
       "id": "gh-validate-002",
       "name": "Validar entrada",
@@ -106,7 +106,7 @@
       "parameters": {
         "toolDescription": "Consulta productos activos cuyo stock actual está por debajo de stock_minimo, con la cantidad faltante.",
         "method": "GET",
-        "url": "http://host.docker.internal:3001/api/reportes/productos-bajo-stock",
+        "url": "={{ $('Validar entrada').first().json.apiBaseUrl + '/api/reportes/productos-bajo-stock' }}",
         "options": {},
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
@@ -128,7 +128,7 @@
       "parameters": {
         "toolDescription": "Consulta unidades vendidas por producto, stock actual, mínimo y cantidad sugerida para una posible reposición durante los últimos siete días.",
         "method": "GET",
-        "url": "http://host.docker.internal:3001/api/reportes/ventas-semana",
+        "url": "={{ $('Validar entrada').first().json.apiBaseUrl + '/api/reportes/ventas-semana' }}",
         "options": {},
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
