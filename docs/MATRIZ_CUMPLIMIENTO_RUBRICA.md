@@ -2,7 +2,7 @@
 
 | Área técnica | Evidencia en Raíz & Madera | Cómo comprobar |
 |---|---|---|
-| Base de datos relacional | `schema.sql`, claves foráneas y restricciones | Cargar el esquema en PostgreSQL y verificar constraints |
+| Base de datos relacional | `schema.sql`, claves foráneas y restricciones | Cargar el esquema en MySQL 8.4 y verificar constraints |
 | CRUD y HTTP REST | `backend/src/routes` y `backend/src/controllers` | Colección Postman |
 | Transacciones | `backend/src/services/pedidos.service.js` | Confirmación con y sin stock y prueba concurrente |
 | Frontend React | `frontend/src/pages`, componentes, hooks y servicios | `npm run build` y demo en navegador |

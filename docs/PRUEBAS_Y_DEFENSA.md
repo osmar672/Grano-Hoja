@@ -42,14 +42,14 @@ Importa `tests/Raiz-y-Madera.postman_collection.json` en Postman; configura `adm
 
 ## Estado honesto de pruebas
 
-El proyecto está estructurado para las pruebas listadas, pero se debe ejecutar contra PostgreSQL y las dependencias reales en el equipo. No afirmes que se pasó una prueba hasta registrar su resultado observado.
+El proyecto está estructurado para las pruebas listadas, pero se debe ejecutar contra MySQL 8.4 y las dependencias reales en el equipo. No afirmes que se pasó una prueba hasta registrar su resultado observado.
 
 
 ## Pruebas adicionales de Google OAuth
 
 1. Con `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y el URI exacto configurados en backend, entra a `/login` y pulsa **Crear usuario con Google**.
 2. Autoriza con un usuario de prueba permitido por la pantalla de consentimiento. Debe volver a `/` con sesión activa.
-3. Comprueba en PostgreSQL que `google_sub` es único y el nuevo usuario tiene rol `caja`, `password_hash IS NULL` y `active = TRUE`.
+3. Comprueba en MySQL 8.4 que `google_sub` es único y el nuevo usuario tiene rol `caja`, `password_hash IS NULL` y `active = TRUE`.
 4. Cierra sesión y pulsa **Continuar con Google**; la cuenta registrada debe volver a iniciar sesión.
 5. Intenta registrar la misma cuenta otra vez: debe mostrar mensaje de cuenta existente.
 6. Inicia el login Google con un correo no registrado: debe sugerir el registro.

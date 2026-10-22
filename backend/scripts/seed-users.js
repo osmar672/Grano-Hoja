@@ -54,15 +54,15 @@ async function seed() {
       const passwordHash = await bcrypt.hash(account.password, BCRYPT_ROUNDS);
       await client.query(
         `INSERT INTO app_users (email, display_name, password_hash, role, active)
-         VALUES ($1, $2, $3, $4, TRUE)
-         ON CONFLICT (email) DO UPDATE SET
-           display_name = EXCLUDED.display_name,
-           password_hash = EXCLUDED.password_hash,
-           role = EXCLUDED.role,
+         VALUES (?, ?, ?, ?, TRUE)
+         ON DUPLICATE KEY UPDATE
+           display_name = VALUES(display_name),
+           password_hash = VALUES(password_hash),
+           role = VALUES(role),
            active = TRUE,
            failed_login_attempts = 0,
            locked_until = NULL,
-           updated_at = NOW()`,
+           updated_at = UTC_TIMESTAMP(3)`,
         [account.email, account.displayName.trim(), passwordHash, account.role],
       );
     }
@@ -81,7 +81,7 @@ try {
   await seed();
 } catch (error) {
   logError('users.seed_failed', { errorName: error.name || 'Error' });
-  process.stderr.write('No se pudieron configurar los usuarios. Revisa las variables SEED_* de backend/.env y la conexión a PostgreSQL.\n');
+  process.stderr.write('No se pudieron configurar los usuarios. Revisa las variables SEED_* de backend/.env y la conexión a MySQL.\n');
   process.exitCode = 1;
 } finally {
   await pool.end();

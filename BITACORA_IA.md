@@ -1,3 +1,5 @@
+> **Estado actual del repositorio:** la versión más reciente usa MySQL 8.4 (`mysql2/promise` y `express-mysql-session`). Algunas entradas anteriores de esta bitácora registran la etapa previa con PostgreSQL y se conservan como historial de decisiones, no como instrucciones actuales.
+
 # BITÁCORA DE USO DE IA — Raíz & Madera
 
 Esta bitácora registra el proceso del proyecto. Las entradas originales del prototipo eran para la cafetería Grano & Hoja; el prompt final de transformación cambió explícitamente el dominio a una tienda de plantas, muebles y decoración. La documentación y el código de esta versión deben tomarse como la base actual.
@@ -127,3 +129,23 @@ ____________________________________________________
 **Qué corregí o rechacé:**
 
 ____________________________________________________________
+
+## Registro — Preparación local de Google OAuth
+
+**Prompt usado:** configurar el Client ID de Google OAuth para el login/registro de Raíz & Madera y preparar un proceso local para guardar el secreto sin incluirlo en Git ni en el ZIP.
+
+**Qué devolvió la IA:** Client ID público preconfigurado en las plantillas de backend y producción, script PowerShell `scripts/configurar-google-local.ps1` para pedir el nuevo Client Secret de forma oculta, generar `SESSION_SECRET` si falta y ajustar `DATABASE_URL` desde `.env` raíz cuando corresponde; documentación de orígenes y callback exactos, migraciones y diagnóstico de errores comunes.
+
+**Qué corregí o rechacé:**
+
+____________________________________________________
+
+
+## 7. Adaptación de persistencia e integración a MySQL + n8n
+
+**Prompt utilizado:** cambiar el proyecto Raíz & Madera para usar MySQL y dejar documentada/conectada la integración del asistente n8n con el frontend a través de la API protegida.
+
+**Qué devolvió la IA:** driver `mysql2/promise`, store de sesiones MySQL, esquemas MySQL 8.4, Compose local/producción, variables DB_*, copia cifrada MySQL, guía `docs/MYSQL_N8N_SETUP.md`, instrucciones de credenciales n8n y checklist de pruebas.
+
+**Qué corregí o rechacé:**
+

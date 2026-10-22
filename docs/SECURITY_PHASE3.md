@@ -24,7 +24,7 @@
 1. Publica frontend y API detrás de HTTPS con certificado válido.
 2. Define `NODE_ENV=production`, `PUBLIC_HTTPS_ORIGIN=https://api.tu-dominio.example`, `CORS_ORIGIN=https://app.tu-dominio.example`, `SESSION_COOKIE_NAME=rm.sid` y el resto de secretos en un gestor de secretos.
 3. Si un proxy termina TLS delante de Express, define `TRUST_PROXY=true` solo cuando hay exactamente un proxy de confianza entre Internet y Express. Configura el proxy para sobrescribir `X-Forwarded-Proto` y `X-Forwarded-For`; no aceptes esas cabeceras directamente desde usuarios.
-4. Sustituye `https://API_ORIGIN_REEMPLAZAR` en los encabezados para Netlify (`frontend/public/_headers`) o Vercel (`frontend/vercel.json`) por el origen HTTPS exacto de la API. Configura lo equivalente si utilizas otro hosting.
+4. La ruta de despliegue soportada está centralizada bajo Caddy + Nginx con un mismo dominio HTTPS. Las cabeceras se definen en `deploy/caddy/Caddyfile` y `frontend/nginx.conf`; si eliges otro proveedor, traslada y prueba CSP, HSTS, CORS y CSRF en ese proveedor antes de exponerlo.
 5. Verifica en las herramientas de desarrollador que la cookie de sesión tenga `Secure`, `HttpOnly` y `SameSite=Lax`, que HSTS solo se envíe por HTTPS y que CSP no bloquee recursos propios.
 6. `style-src 'unsafe-inline'` se conserva temporalmente por compatibilidad con estilos dinámicos existentes. Antes de producción de alta seguridad, migra estilos inline a clases CSS y quita esa excepción.
 

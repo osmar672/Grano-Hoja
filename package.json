@@ -1,0 +1,27 @@
+{
+  "name": "raiz-y-madera-vercel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "build": "npm run vercel-build",
+    "vercel-build": "npm run build --workspace=raiz-madera-frontend && node scripts/prepare-vercel-public.mjs",
+    "dev": "npm run dev --workspace=raiz-madera-frontend",
+    "check:vercel": "node scripts/check-vercel.mjs"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "4.22.2",
+    "express-mysql-session": "^3.0.3",
+    "express-rate-limit": "^8.7.1",
+    "express-session": "^1.19.0",
+    "google-auth-library": "^11.3.1",
+    "helmet": "^8.3.0",
+    "mysql2": "^3.24.5",
+    "zod": "^4.6.7"
+  }
+}

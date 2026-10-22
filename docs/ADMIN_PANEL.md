@@ -20,7 +20,7 @@ No se permite a un administrador cambiar su propio rol/estado desde este panel. 
 En PowerShell desde la raíz del proyecto, con Docker Compose activo:
 
 ```powershell
-Get-Content backend/migrations/003_admin_tools.sql | docker compose exec -T db psql -U postgres -d raiz_madera
+Get-Content backend/migrations/003_admin_tools.sql | docker compose exec -T db mysql -u raiz_app -p raiz_madera
 ```
 
 Si usas otro nombre de base o usuario, reemplázalo. En una base nueva inicializada desde `schema.sql` no hace falta correr esta migración.

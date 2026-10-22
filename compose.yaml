@@ -1,22 +1,50 @@
 services:
   db:
-    image: postgres:16-alpine
-    container_name: raiz-madera-db
+    image: mysql:8.4
+    container_name: raiz-madera-mysql
     restart: unless-stopped
+    command: ["--default-time-zone=+00:00"]
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-raiz_madera}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Crea .env desde .env.example y define POSTGRES_PASSWORD}
-      TZ: America/Costa_Rica
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-raiz_madera}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Crea .env y define MYSQL_ROOT_PASSWORD}
+      MYSQL_APP_USER: ${MYSQL_APP_USER:-raiz_app}
+      MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD:?Define MYSQL_APP_PASSWORD en el .env raíz}
+      TZ: UTC
     ports:
-      - "5432:5432"
+      - "127.0.0.1:3306:3306"
     volumes:
-      - raiz_madera_data:/var/lib/postgresql/data
+      - raiz_madera_mysql_data:/var/lib/mysql
+      - ./deploy/mysql/00-create-app-user.sh:/docker-entrypoint-initdb.d/00-create-app-user.sh:ro
       - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+
+  n8n:
+    image: n8nio/n8n:stable
+    container_name: raiz-madera-n8n
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_EDITOR_BASE_URL: http://localhost:5678/
+      WEBHOOK_URL: http://localhost:5678/
+      N8N_SECURE_COOKIE: "false"
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Define N8N_ENCRYPTION_KEY en el .env raíz}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      GENERIC_TIMEZONE: America/Costa_Rica
+      TZ: America/Costa_Rica
+    volumes:
+      - raiz_madera_n8n_data:/home/node/.n8n
+    security_opt: ["no-new-privileges:true"]
+
 volumes:
-  raiz_madera_data:
+  raiz_madera_mysql_data:
+  raiz_madera_n8n_data:

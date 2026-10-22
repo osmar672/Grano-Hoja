@@ -1,11 +1,9 @@
 import { timingSafeEqual } from 'node:crypto';
+import { getConfiguredOrigins } from '../utils/deploymentOrigin.js';
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-function configuredOrigins() {
-  return (process.env.CORS_ORIGIN || 'http://localhost:5173')
-    .split(',').map((origin) => origin.trim()).filter(Boolean);
-}
+function configuredOrigins() { return getConfiguredOrigins(); }
 
 export function csrfTokenMatches(expected, supplied) {
   if (typeof expected !== 'string' || typeof supplied !== 'string') return false;

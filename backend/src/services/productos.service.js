@@ -1,7 +1,7 @@
 import { pool } from '../db.js';
 import { AppError } from '../utils/AppError.js';
 
-const sortColumns = { nombre: 'nombre', precio: 'precio', categoria: 'categoria', stock: 'stock' };
+const sortColumns = { nombre: 'p.nombre', precio: 'p.precio', categoria: 'p.categoria', stock: 'p.stock' };
 const allowedCategories = new Set(['plantas', 'muebles', 'decoracion']);
 function validateProduct(data = {}) {
   const nombre = typeof data.nombre === 'string' ? data.nombre.trim() : '';
@@ -17,29 +17,32 @@ function validateProduct(data = {}) {
   return { nombre, descripcion, precio: Math.round(precio * 100) / 100, categoria, stock, stock_minimo: stockMinimo, activo };
 }
 
+function mysqlDuplicate(error) { return error?.code === 'ER_DUP_ENTRY'; }
+function mysqlForeignKey(error) { return ['ER_ROW_IS_REFERENCED_2', 'ER_NO_REFERENCED_ROW_2'].includes(error?.code); }
+
 export async function listarProductos(query = {}) {
   const q = String(query.q || '').trim(); const categoria = String(query.categoria || '').trim();
-  const order = sortColumns[query.orden] || 'nombre'; const direction = String(query.direccion).toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+  const order = sortColumns[query.orden] || 'p.nombre'; const direction = String(query.direccion).toLowerCase() === 'desc' ? 'DESC' : 'ASC';
   const activo = query.activo === 'true' ? true : query.activo === 'false' ? false : null;
   const lowOnly = query.bajo_stock === 'true';
-  const { rows } = await pool.query(`SELECT p.*, (p.stock < p.stock_minimo) AS bajo_stock,
-      COALESCE(s.unidades_vendidas_7_dias,0)::int AS unidades_vendidas_7_dias
+  const { rows } = await pool.query(`SELECT p.*,
+      (p.stock < p.stock_minimo) AS bajo_stock,
+      COALESCE((SELECT SUM(pi.cantidad) FROM pedido_items pi JOIN pedidos pe ON pe.id=pi.pedido_id
+        WHERE pi.producto_id=p.id AND pe.estado='confirmado' AND pe.fecha_confirmacion >= DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 7 DAY)),0) AS unidades_vendidas_7_dias
     FROM productos p
-    LEFT JOIN LATERAL (SELECT SUM(pi.cantidad) AS unidades_vendidas_7_dias FROM pedido_items pi JOIN pedidos pe ON pe.id=pi.pedido_id
-      WHERE pi.producto_id=p.id AND pe.estado='confirmado' AND pe.fecha_confirmacion >= NOW() - INTERVAL '7 days') s ON TRUE
-    WHERE ($1='' OR p.nombre ILIKE '%' || $1 || '%' OR p.descripcion ILIKE '%' || $1 || '%')
-      AND ($2='' OR p.categoria=$2) AND ($3::boolean IS NULL OR p.activo=$3)
-      AND (NOT $4 OR p.stock < p.stock_minimo)
-    ORDER BY ${order} ${direction}, p.id ASC`, [q, categoria, activo, lowOnly]);
+    WHERE (? = '' OR p.nombre LIKE CONCAT('%', ?, '%') OR p.descripcion LIKE CONCAT('%', ?, '%'))
+      AND (? = '' OR p.categoria = ?)
+      AND (? IS NULL OR p.activo = ?)
+      AND (? = 0 OR p.stock < p.stock_minimo)
+    ORDER BY ${order} ${direction}, p.id ASC`, [q, q, q, categoria, categoria, activo, activo, lowOnly ? 1 : 0]);
   return rows;
 }
 
 export async function obtenerProducto(id) {
   const { rows } = await pool.query(`SELECT p.*, (p.stock < p.stock_minimo) AS bajo_stock,
-      COALESCE(s.unidades_vendidas_30_dias,0)::int AS unidades_vendidas_30_dias
-    FROM productos p LEFT JOIN LATERAL (SELECT SUM(pi.cantidad) AS unidades_vendidas_30_dias
-      FROM pedido_items pi JOIN pedidos pe ON pe.id=pi.pedido_id WHERE pi.producto_id=p.id AND pe.estado='confirmado'
-      AND pe.fecha_confirmacion >= NOW() - INTERVAL '30 days') s ON TRUE WHERE p.id=$1`, [id]);
+      COALESCE((SELECT SUM(pi.cantidad) FROM pedido_items pi JOIN pedidos pe ON pe.id=pi.pedido_id
+        WHERE pi.producto_id=p.id AND pe.estado='confirmado' AND pe.fecha_confirmacion >= DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 30 DAY)),0) AS unidades_vendidas_30_dias
+    FROM productos p WHERE p.id=?`, [id]);
   if (!rows[0]) throw new AppError(404, 'Producto no encontrado');
   return rows[0];
 }
@@ -47,10 +50,10 @@ export async function obtenerProducto(id) {
 export async function crearProducto(data) {
   const value = validateProduct(data);
   try {
-    const { rows } = await pool.query(`INSERT INTO productos(nombre, descripcion, precio, categoria, stock, stock_minimo, activo)
-      VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [value.nombre, value.descripcion, value.precio, value.categoria, value.stock, value.stock_minimo, value.activo]);
-    return rows[0];
-  } catch (error) { if (error.code === '23505') throw new AppError(409, 'Ya existe un producto con ese nombre'); throw error; }
+    const result = await pool.query(`INSERT INTO productos(nombre, descripcion, precio, categoria, stock, stock_minimo, activo)
+      VALUES(?,?,?,?,?,?,?)`, [value.nombre, value.descripcion, value.precio, value.categoria, value.stock, value.stock_minimo, value.activo]);
+    return obtenerProducto(result.insertId);
+  } catch (error) { if (mysqlDuplicate(error)) throw new AppError(409, 'Ya existe un producto con ese nombre'); throw error; }
 }
 
 export async function actualizarProducto(id, data, partial = false) {
@@ -58,16 +61,15 @@ export async function actualizarProducto(id, data, partial = false) {
   const merged = partial ? { nombre: actual.nombre, descripcion: actual.descripcion, precio: Number(actual.precio), categoria: actual.categoria, stock: actual.stock, stock_minimo: actual.stock_minimo, activo: actual.activo, ...data } : data;
   const value = validateProduct(merged);
   try {
-    const { rows } = await pool.query(`UPDATE productos SET nombre=$1, descripcion=$2, precio=$3, categoria=$4, stock=$5,
-      stock_minimo=$6, activo=$7, updated_at=NOW() WHERE id=$8 RETURNING *`, [value.nombre, value.descripcion, value.precio, value.categoria, value.stock, value.stock_minimo, value.activo, id]);
-    if (!rows[0]) throw new AppError(404, 'Producto no encontrado');
-    return rows[0];
-  } catch (error) { if (error.code === '23505') throw new AppError(409, 'Ya existe un producto con ese nombre'); throw error; }
+    await pool.query(`UPDATE productos SET nombre=?, descripcion=?, precio=?, categoria=?, stock=?, stock_minimo=?, activo=?, updated_at=UTC_TIMESTAMP(3) WHERE id=?`,
+      [value.nombre, value.descripcion, value.precio, value.categoria, value.stock, value.stock_minimo, value.activo, id]);
+    return obtenerProducto(id);
+  } catch (error) { if (mysqlDuplicate(error)) throw new AppError(409, 'Ya existe un producto con ese nombre'); throw error; }
 }
 
 export async function eliminarProducto(id) {
   await obtenerProducto(id);
-  try { await pool.query('DELETE FROM productos WHERE id=$1', [id]); }
-  catch (error) { if (error.code === '23503') throw new AppError(409, 'No se puede eliminar un producto que aparece en el historial de ventas'); throw error; }
+  try { await pool.query('DELETE FROM productos WHERE id=?', [id]); }
+  catch (error) { if (mysqlForeignKey(error)) throw new AppError(409, 'No se puede eliminar un producto que aparece en el historial de ventas'); throw error; }
   return { id: Number(id), eliminado: true };
 }

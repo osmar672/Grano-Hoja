@@ -1,271 +1,152 @@
 # Raíz & Madera
 
-Sistema de gestión para una tienda de **plantas, muebles y decoración**. Incluye catálogo, inventario por unidades, ventas, cierre de caja y un asistente de reposición con n8n. La identidad visual conserva la temática de bosque verde oscuro, crema y motivos botánicos, con animaciones CSS sutiles.
+Tienda de plantas, muebles y decoración. Aplicación full-stack con React + Vite, API REST en Node.js/Express, MySQL 8.4, sesiones seguras, roles, Google OAuth y asistente de reposición con n8n.
 
-> **Nota sobre el alcance académico:** este proyecto reemplaza el caso original de cafetería por una tienda de decoración, tal como se solicitó durante el rediseño. Si la evaluación exige mantener literalmente el Caso 1 de la rúbrica del Laboratorio #2, confirma con el docente que acepta este cambio de dominio. Se mantienen las características técnicas de CRUD, sesión, roles, transacciones, reportes, frontend y agente.
+> **Estado:** proyecto preparado para probar en local. Antes de producción debes ejecutar las pruebas localmente, revisar `npm audit`, configurar un dominio HTTPS, crear/rotar secretos reales y probar Google OAuth/n8n. No se afirma que servicios externos estén probados sin tus credenciales.
 
-## Funciones
-
-- Inicio de sesión mediante sesión almacenada en PostgreSQL; contraseñas con bcrypt y límite de intentos.
-- Roles `admin`, `encargado` y `caja`, autorizados en el backend. El panel `/admin` (solo administración) permite gestionar cuentas, roles, estado, restablecer contraseñas y revisar la actividad registrada.
-- Catálogo de plantas, muebles y decoración con búsqueda, filtros y ordenamiento.
-- CRUD de productos, incluyendo precio, descripción, categoría, existencias, mínimo de reposición y estado activo.
-- Ventas con precio histórico por línea, impuesto de demostración del 13 %, método de pago y estado.
-- Confirmación de venta en transacción: bloquea los productos por ID, valida existencias y descuenta stock sin permitir cantidades negativas.
-- Anulación de venta confirmada durante los primeros 15 minutos desde la confirmación; el stock se devuelve dentro de la transacción. Las pendientes se pueden anular sin ajustar stock.
-- Panel con total diario por método de pago, cinco artículos más vendidos y alertas de bajo stock.
-- Reportes de productos por debajo del mínimo y ventas de los últimos siete días; el agente redacta sugerencias, pero no modifica existencias.
-- Diseño adaptable y animaciones que respetan `prefers-reduced-motion`.
-
-## Estructura
-
-```text
-Raiz-y-Madera/
-├── schema.sql
-├── compose.yaml
-├── backend/
-│   ├── migrations/          # Migraciones incrementales para bases existentes
-│   ├── src/routes/          # Endpoints REST
-│   ├── src/controllers/     # Entrada/salida HTTP
-│   ├── src/services/        # SQL y reglas de negocio
-│   ├── src/middleware/      # Sesión, roles, validación y errores
-│   ├── src/validation/      # Esquemas Zod
-│   └── scripts/seed-users.js
-├── frontend/
-│   └── src/                 # React, páginas, componentes, hooks y servicios
-├── n8n/workflow_raiz_madera.json
-├── tests/Raiz-y-Madera.postman_collection.json
-├── SECURITY.md
-└── BITACORA_IA.md
-```
+## Stack
+- `frontend/`: React, Vite, React Router y CSS propio; las solicitudes van a `/api`.
+- `backend/`: Express por capas, `mysql2/promise`, `express-session`, almacenamiento de sesiones en MySQL, bcrypt, Zod, Helmet, CORS de lista blanca y protección CSRF.
+- `schema.sql`: estructura MySQL 8.4 más datos demostrativos de productos y ventas.
+- `schema.production.sql`: estructura sin datos de demostración ni instrucciones DROP.
+- `n8n/workflow_raiz_madera.json`: agente de reposición; se importan credenciales dentro de n8n, nunca dentro del JSON.
+- `compose.yaml`: MySQL y n8n para desarrollo local. La API y React se ejecutan en terminales; n8n está en Docker.
+- `compose.production.yaml`: MySQL privada, API, frontend/Nginx y Caddy HTTPS. La instancia productiva de n8n se configura aparte (n8n cloud/servidor seguro) y se conecta por HTTPS.
 
 ## Requisitos
+- Node.js 22.12+ y npm.
+- Docker Desktop / Docker Compose.
+- Cuenta/proyecto de Google Cloud OAuth si vas a probar inicio de sesión con Google.
+- Una credencial de modelo de chat (por ejemplo, OpenAI) para el agente de n8n.
 
-- Node.js 20+ y npm.
-- Docker Desktop con Docker Compose, o PostgreSQL 14+ instalado.
-- Para el agente, una instancia n8n y una credencial para el modelo de chat que elijas.
+## Desarrollo en Windows (PowerShell)
 
-## 1. Preparar PostgreSQL (Windows / Docker Desktop)
+### 1. Configurar el entorno
 
-Desde la raíz del proyecto, abre PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-notepad .env
-```
-
-Define `POSTGRES_PASSWORD` con una contraseña propia. Luego crea la base:
+Desde la raíz del repositorio, la forma sencilla es ejecutar el asistente de configuración. Genera secretos para MySQL/sesión/n8n, alinea las variables DB_* y te pide de forma oculta las contraseñas iniciales y un nuevo Google Client Secret si aún no está configurado:
 
 ```powershell
-docker compose up -d db
+powershell -ExecutionPolicy Bypass -File .\scripts\configurar-integracion-local.ps1
 ```
 
-PostgreSQL ejecuta `schema.sql` automáticamente al inicializar un volumen nuevo. Si vienes de la versión Grano & Hoja y tienes el volumen antiguo, los inicializadores no se ejecutan otra vez. Para una base de demostración desechable puedes reiniciar desde cero:
-
-```powershell
-docker compose down -v
-docker compose up -d db
-```
-
-**Advertencia:** `docker compose down -v` elimina los datos de la base anterior. No lo ejecutes si necesitas conservarlos. También puedes crear una base nueva `raiz_madera` y cargar `schema.sql` en pgAdmin o con `psql`.
-
-Comprobaciones SQL:
-
-```sql
-SELECT COUNT(*) FROM productos;
-SELECT categoria, COUNT(*) FROM productos GROUP BY categoria;
-SELECT nombre, stock, stock_minimo FROM productos WHERE stock < stock_minimo;
-SELECT estado, COUNT(*) FROM pedidos GROUP BY estado;
-```
-
-## 2. Configurar y ejecutar el backend
-
-Copia las variables de ejemplo y edita el archivo local:
-
-```powershell
-Copy-Item backend/.env.example backend/.env
-notepad backend/.env
-```
-
-En `backend/.env`, conserva las variables e introduce la misma contraseña PostgreSQL que configuraste en la raíz, en `DATABASE_URL`. Genera un secreto para la sesión:
+El script escribe `.env` y `backend/.env`, que son locales y están excluidos de Git. No imprime los secretos. Si prefieres hacerlo a mano, copia `.env.example` a `.env` y `backend/.env.example` a `backend/.env`, y completa los campos vacíos. La contraseña `MYSQL_APP_PASSWORD` de la raíz debe ser **idéntica** a `DB_PASSWORD` de `backend/.env`. El script de creación del usuario exige una contraseña de al menos 32 caracteres alfanuméricos/guion/guion bajo. Genera claves distintas con:
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
-Pega ese valor en `SESSION_SECRET`. Define tres contraseñas distintas en `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_PASSWORD` y `SEED_CASHIER_PASSWORD`. Cada una debe tener al menos 12 caracteres, incluir mayúscula, minúscula y número y no superar 72 bytes. No las pongas en Git ni en capturas.
+Usa valores diferentes para `MYSQL_ROOT_PASSWORD`, `MYSQL_APP_PASSWORD`, `SESSION_SECRET`, `N8N_ENCRYPTION_KEY`, `N8N_WEBHOOK_AUTH_TOKEN` y `N8N_API_SERVICE_TOKEN`. No copies secretos de chats ni uses el antiguo Google Client Secret si ya fue compartido; rota el secreto en Google Cloud y guarda el nuevo solo en `backend/.env`.
 
-Luego ejecuta:
+### 2. Iniciar MySQL y n8n
+
+```powershell
+docker compose up -d db n8n
+```
+
+El primer arranque de un volumen MySQL nuevo ejecuta `schema.sql` y carga los datos demostrativos. Si ya existe el volumen, el contenedor **no** vuelve a ejecutar el esquema. Para reiniciar una base de demostración descartable desde cero, solo si aceptas perder todos sus datos:
+
+```powershell
+docker compose down
+# ADVERTENCIA: elimina datos si también agregas -v. No uses -v si hay ventas que conservar.
+docker compose up -d db n8n
+```
+
+La base está enlazada solamente a `127.0.0.1:3306`; no la expongas a Internet.
+
+### 3. Instalar e iniciar la API
 
 ```powershell
 cd backend
 npm install
-npm run users:seed
 npm run check
 npm test
+npm run users:seed
 npm run dev
 ```
 
-La API queda en `http://localhost:3001`. Prueba `http://localhost:3001/api/health`; debe devolver `200` y `{"ok":true,"message":"API Raíz & Madera activa"}`. Los endpoints comerciales devuelven `401` si no hay sesión activa.
+`npm run users:seed` necesita las tres contraseñas seguras definidas en `backend/.env`. Este script crea/actualiza usuarios de muestra `admin`, `encargado` y `caja`. No uses esas cuentas de ejemplo en producción.
 
-### Panel de administración
+API: `http://localhost:3001/api/health` y `http://localhost:3001/api/ready`.
 
-El rol `admin` ve la opción **Admin** en la navegación y puede abrir `/admin`. La página permite consultar métricas administrativas, crear cuentas locales, buscar/filtrar usuarios, cambiar roles, activar/desactivar cuentas, restablecer contraseñas y consultar auditoría reciente. El backend vuelve a comprobar el rol en todas las rutas `/api/admin`; ocultar el enlace en React no es una medida de seguridad. No se permite cambiar el propio rol/estado ni desactivar o degradar al último administrador activo.
+### 4. Iniciar React
 
-En bases existentes, ejecuta la migración una sola vez desde la raíz (ajusta usuario/base si corresponde):
-
-```powershell
-Get-Content backend/migrations/003_admin_tools.sql | docker compose exec -T db psql -U postgres -d raiz_madera
-```
-
-En una base nueva, `schema.sql` ya crea `admin_audit_events`. Las rutas administrativas son `GET /api/admin/overview`, `GET /api/admin/users`, `POST /api/admin/users`, `PATCH /api/admin/users/:id` y `GET /api/admin/audit`. Las contraseñas se validan en el servidor y se almacenan con bcrypt; la bitácora no guarda credenciales ni correos.
-
-### Registro y acceso con Google
-
-La pantalla `/login` ofrece **Continuar con Google** y **Crear usuario con Google**. La integración usa el flujo OAuth 2.0 Authorization Code del servidor con la biblioteca oficial `google-auth-library`, `state`, `nonce`, PKCE S256 y verificación del ID token. Solo se solicitan los scopes OpenID `openid`, `email` y `profile`; la aplicación no lee el buzón ni pide la contraseña de Google. Google exige que el URI de redirección coincida exactamente con el configurado en Cloud Console.
-
-1. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials), crea o selecciona un proyecto y configura la pantalla de consentimiento OAuth.
-2. Crea credenciales de **OAuth client ID** de tipo **Web application**.
-3. Añade este URI en **Authorized redirect URIs**: `http://localhost:3001/api/auth/google/callback`. Para producción, usa el callback HTTPS exacto de tu dominio.
-4. Copia `backend/.env.example` a `backend/.env` y define `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` y `FRONTEND_URL`. Nunca pongas el secreto en una variable `VITE_`.
-5. Ejecuta la migración `backend/migrations/002_google_oauth.sql` en la base de datos existente, reinicia el backend y prueba primero con un usuario de test de la pantalla de consentimiento.
-
-Para una base nueva, `schema.sql` ya incluye los campos; la migración 002 crea además el índice único del identificador de Google. En PowerShell, desde la raíz del proyecto, puedes aplicar la migración así (ajusta el usuario/base si los personalizaste):
+Abre una terminal nueva, desde la raíz:
 
 ```powershell
-Get-Content backend/migrations/002_google_oauth.sql | docker compose exec -T db psql -U postgres -d raiz_madera
-```
-
-El registro de Google crea una cuenta con rol inicial `caja` y nunca permite elegir `admin` ni `encargado`. Si el correo ya existe como cuenta local, no se enlaza de forma automática; así se evita elevar privilegios por coincidencia de correo. Esa cuenta sigue entrando con su método habitual. La sesión se regenera después del callback. La cookie utiliza `SameSite=Lax` porque el callback OAuth llega como navegación GET desde Google; conserva `HttpOnly` y `Secure` en producción.
-
-### Usuarios iniciales
-
-Los correos de muestra se configuran en `backend/.env`:
-
-- `admin@raizymadera.local` — administración y todas las operaciones.
-- `encargado@raizymadera.local` — catálogo, operaciones y asistente de reposición; no elimina productos.
-- `caja@raizymadera.local` — consulta catálogo, registra ventas y consulta cierre/alertas; no modifica catálogo ni usa el asistente.
-
-Las contraseñas no se distribuyen en el ZIP. Tú las defines en `.env` y el script guarda hashes bcrypt.
-
-## 3. Ejecutar el frontend
-
-Abre otra terminal desde la raíz:
-
-```powershell
-Copy-Item frontend/.env.example frontend/.env
 cd frontend
 npm install
+npm run build
 npm run dev
 ```
 
-Abre la URL que muestre Vite (normalmente `http://localhost:5173`). No abras `index.html` con doble clic. El frontend usa `VITE_API_URL=http://localhost:3001/api` y mantiene la cookie de sesión mediante `credentials: 'include'`.
+Abre `http://localhost:5173`. El frontend utiliza `/api` y Vite proxy al backend en `http://127.0.0.1:3001`. No configures una URL localhost pública para producción.
 
-## 4. Flujo de venta e inventario
+## Conectar n8n con la página
 
-1. La persona selecciona productos y cantidades en `/pedidos/nuevo`.
-2. La API crea una venta pendiente y guarda el precio unitario de cada línea.
-3. La pantalla solicita la confirmación. El backend vuelve a leer y bloquear los productos dentro de una transacción.
-4. Si el stock agregado para cualquiera de los productos no alcanza, responde `409`, hace `ROLLBACK` y no descuenta parcialmente.
-5. Si alcanza, descuenta stock y pone la venta en `confirmado`.
-6. Durante 15 minutos desde `fecha_confirmacion`, se puede anular. En ese caso, se devuelve stock y el pedido pasa a `anulado`. Fuera del plazo la API devuelve `409`.
-7. Las ventas anuladas no cuentan en el cierre de caja.
+Sigue el paso-a-paso completo en [`docs/MYSQL_N8N_SETUP.md`](docs/MYSQL_N8N_SETUP.md). Resumen:
+1. Abre `http://localhost:5678`, termina el onboarding de n8n.
+2. Importa `n8n/workflow_raiz_madera.json`.
+3. Crea una credencial **Header Auth** para el nodo Webhook: header `x-rm-webhook-token`, valor exactamente igual a `N8N_WEBHOOK_AUTH_TOKEN` del backend.
+4. Crea otra credencial **Header Auth** para los nodos HTTP Request Tool: header `x-service-token`, valor igual a `N8N_API_SERVICE_TOKEN` del backend. Asigna esa credencial a ambas herramientas.
+5. Asigna una credencial válida al nodo **OpenAI Chat Model** (el workflow exportado no incluye credenciales).
+6. Activa el workflow y comprueba que su ruta sea `/webhook/raiz-madera/asistente-compras`.
+7. React llama a `POST /api/agente/sugerencia-compra`; Express valida sesión/rol, llama al webhook con el token privado y devuelve `{ ok, data, error }`. n8n consulta los reportes a través de endpoints protegidos de Express; no conecta directamente a MySQL.
 
-El impuesto del 13 % se conserva como regla del ejercicio. Si la tienda operara realmente, verifica el tratamiento fiscal que corresponda antes de usar el sistema con datos de producción.
+## Conectar Google OAuth
 
-## 5. API disponible
+Consulta [`docs/GOOGLE_OAUTH_SETUP.md`](docs/GOOGLE_OAUTH_SETUP.md). En Google Cloud Console, para desarrollo local configura:
+- Origen autorizado: `http://localhost:5173`
+- URI de redireccionamiento: `http://localhost:3001/api/auth/google/callback`
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET | `/api/health` | Salud del servidor |
-| POST | `/api/auth/login` | Inicio de sesión con rate limit |
-| GET | `/api/auth/google/start?intent=login` | Inicio con cuenta Google ya vinculada |
-| GET | `/api/auth/google/start?intent=register` | Crear usuario nuevo verificando Google (rol inicial caja) |
-| GET | `/api/auth/google/callback` | Callback OAuth validado por el servidor |
-| GET | `/api/auth/me` | Usuario de la sesión actual |
-| GET | `/api/admin/overview` | Métricas operativas para el rol `admin` |
-| GET | `/api/admin/users` | Buscar/filtrar usuarios (solo `admin`) |
-| POST | `/api/admin/users` | Crear cuenta local con rol inicial controlado (solo `admin`) |
-| PATCH | `/api/admin/users/:id` | Cambiar rol/estado o restablecer contraseña (solo `admin`) |
-| GET | `/api/admin/audit` | Actividad reciente del catálogo, ventas y usuarios (solo `admin`) |
-| POST | `/api/auth/logout` | Destruir sesión |
-| GET | `/api/productos` | Catálogo con `q`, `categoria`, `orden`, `direccion`, `activo`, `bajo_stock` |
-| POST | `/api/productos` | Crear producto (`admin`, `encargado`) |
-| GET | `/api/productos/:id` | Detalle y ventas recientes agregadas |
-| PUT / PATCH | `/api/productos/:id` | Editar producto (`admin`, `encargado`) |
-| DELETE | `/api/productos/:id` | Eliminar producto (`admin`); no permite borrar un producto con ventas históricas |
-| GET | `/api/pedidos` | Historial con `estado` y `metodo_pago` opcionales |
-| POST | `/api/pedidos` | Crear venta pendiente con items |
-| GET | `/api/pedidos/:id` | Detalle de venta e items |
-| POST | `/api/pedidos/:id/confirmar` | Confirmar y descontar inventario en transacción |
-| POST | `/api/pedidos/:id/anular` | Anular dentro de las reglas del negocio |
-| GET | `/api/resumen?fecha=YYYY-MM-DD` | Cierre de caja del día en `America/Costa_Rica` |
-| GET | `/api/reportes/productos-bajo-stock` | Alerta de productos bajo mínimo (sesión autorizada o token de servicio) |
-| GET | `/api/reportes/ventas-semana` | Unidades vendidas, stock actual y cantidad sugerida (admin/encargado o token de servicio) |
-| POST | `/api/agente/sugerencia-compra` | Proxy autenticado al asistente privado de n8n (admin/encargado) |
+Completa `GOOGLE_CLIENT_ID` y el nuevo `GOOGLE_CLIENT_SECRET` en `backend/.env`. Si la pantalla OAuth está en modo de prueba, añade tu cuenta en la lista de usuarios de prueba. Nunca coloques el secreto en variables `VITE_` ni en Git.
 
-Errores en HTTP se devuelven como `{ "error": "mensaje" }`. Los códigos relevantes son `400` para datos inválidos, `401` para falta de sesión, `403` para rol sin permisos, `404` para ID inexistente y `409` para conflictos como stock insuficiente, duplicados o anulación vencida.
+## Base de datos MySQL
 
-## 6. Configurar n8n
+Conexión local desde MySQL Workbench: host `127.0.0.1`, puerto `3306`, base `raiz_madera`, usuario `raiz_app`; contraseña igual a `MYSQL_APP_PASSWORD`/`DB_PASSWORD`. También puedes usar:
 
-Importa `n8n/workflow_raiz_madera.json`. En el nodo **OpenAI Chat Model**, selecciona una credencial de modelo de chat. El JSON no contiene credenciales.
-
-En `backend/.env` configura:
-
-- `N8N_WEBHOOK_URL`: URL real del webhook activado.
-- `N8N_WEBHOOK_AUTH_TOKEN`: secreto largo que también se configura como credencial **Header Auth** del nodo Webhook usando el header `x-rm-webhook-token`.
-- `N8N_API_SERVICE_TOKEN`: otro secreto diferente, para los HTTP Request Tools de n8n hacia la API usando el header `x-service-token`.
-
-React **no** llama al webhook directamente; utiliza `POST /api/agente/sugerencia-compra`. Los secretos de servicio permanecen en backend/n8n, nunca en variables `VITE_`. Ajusta las URLs de las herramientas si n8n se ejecuta fuera del Docker Desktop del host:
-
-- n8n en Docker y API en el host: normalmente `http://host.docker.internal:3001/api`.
-- n8n en el mismo host sin Docker: `http://localhost:3001/api`.
-- n8n Cloud: la API debe ser accesible por una URL HTTPS desde la nube; `localhost` no funciona allí.
-
-El agente lee productos de bajo stock y reporte semanal y responde `{ ok, data, error }`. Solo redacta recomendaciones; no actualiza stock ni crea órdenes.
-
-## 7. Pruebas manuales / Postman
-
-Importa `tests/Raiz-y-Madera.postman_collection.json` en Postman. Define `adminPassword` y `cashierPassword` como variables de colección solo en tu entorno local y ejecuta la colección de arriba abajo: primero comprueba que caja no puede administrar el catálogo, luego inicia sesión como admin y corre el CRUD y las ventas. Postman mantiene la cookie de sesión.
-
-La colección incluye health, login, sesión, catálogo, reportes, CRUD de producto temporal, crear/confirmar/anular una venta y logout. Comprueba también manualmente que:
-
-- Sin cookie `GET /api/productos` devuelve `401`.
-- El rol `caja` recibe `403` al intentar `POST /api/productos`.
-- Crear o confirmar una venta con más unidades de las disponibles responde `409` y deja el stock sin cambios.
-- Una anulación fuera de los 15 minutos devuelve `409`.
-- Un texto HTML en `nombre` o `descripcion` es rechazado con `400`.
-
-## 8. Seguridad, datos personales y despliegue
-
-Consulta `SECURITY.md` para medidas, pendientes y configuración. Las medidas actuales incluyen sesión server-side en PostgreSQL, cookie HttpOnly/SameSite, hash bcrypt, bloqueo temporal de login, rate limiting, autorización por rol, esquemas Zod estrictos, SQL parametrizado y secretos en `.env`.
-
-La configuración de HTTPS/HSTS/CSP/CSRF para producción, copias de seguridad cifradas y una ejecución completa de OWASP ZAP siguen requiriendo despliegue/pruebas externas. No lo publiques como sistema de producción hasta completar los pendientes, probar restauración de backups, revisar `npm audit` en tu entorno y configurar HTTPS en el proxy/hosting. Para datos personales, minimiza los datos recogidos y revisa los avisos de privacidad y consentimiento de acuerdo con la Ley 8968 de Costa Rica antes de operar con clientes reales.
-
-## 9. Git
-
-```bash
-git init
-git add .
-git commit -m "feat: transformar el sistema en Raíz & Madera"
+```powershell
+docker compose exec db mysql -u raiz_app -p raiz_madera
 ```
 
-Si ya existe un remoto, usa `git remote -v` para verificarlo y después `git push`. No agregues `.env`, tokens, contraseñas ni credenciales exportadas.
+Para instalar una **base nueva de producción**, el Compose ejecuta `schema.production.sql`, que no incluye pedidos/products de demo. No se debe ejecutar `schema.sql` sobre datos reales: contiene `DROP TABLE` y datos de ejemplo. Migrar desde una base PostgreSQL antigua requiere un proceso de exportación/importación separado; cambiar las variables de entorno no migra datos.
 
+## Pruebas, logs y despliegue
 
-## Seguridad de peticiones y despliegue
+```powershell
+cd backend
+npm run check:integration
+npm test
+npm run audit
+npm run outdated
+cd ../frontend
+npm run build
+npm run audit
+```
 
-- React solicita `GET /api/auth/csrf` y adjunta `X-CSRF-Token` en mutaciones; este proceso está centralizado en `frontend/src/services/api.js`.
-- Si pruebas con curl, primero obtén el token manteniendo cookies de sesión y úsalo en la cabecera `X-CSRF-Token`. La colección Postman incluye un script de pre-request para hacerlo automáticamente.
-- Para producción, configura `NODE_ENV=production`, `PUBLIC_HTTPS_ORIGIN`, `CORS_ORIGIN` con el origen real de frontend, y un certificado TLS válido. Si hay proxy inverso, configura `TRUST_PROXY` solo de acuerdo con su topología.
-- Reemplaza `API_ORIGIN_REEMPLAZAR` en `frontend/public/_headers` o `frontend/vercel.json` antes de publicar en ese proveedor.
-- Consulta `SECURITY.md` y `docs/SECURITY_PHASE3.md` para las medidas de cabeceras, CSRF y HTTPS; no se certifica el despliegue hasta probar el dominio real.
+Importa `tests/Raiz-y-Madera.postman_collection.json` en Postman para las pruebas API. Consulta `docs/RELEASE_CHECKLIST.md`, `docs/PRODUCCION.md` y `SECURITY.md` antes de publicar. Para producción necesitas dominio/DNS, secretos diferentes, OAuth autorizado en HTTPS, n8n accesible mediante HTTPS, backup cifrado probado y escaneos de seguridad. `compose.production.yaml` no expone MySQL en el host.
 
+## Desplegar en Vercel
 
-## Fase 4 — Auditoría de dependencias y logs
+Ejecuta `npm run check:vercel` para revisar la configuración específica de Vercel antes de publicar.
 
-- Ejecuta `npm install`, `npm run audit`, `npm run outdated`, `npm run check` y `npm test` en backend; después ejecuta `npm install`, `npm run audit`, `npm run outdated` y `npm run build` en frontend.
-- Guarda los dos lockfiles creados en Git para instalaciones reproducibles. Tras guardarlos, se puede cambiar el CI a `npm ci`.
-- `.github/dependabot.yml` comprueba actualizaciones semanalmente y `.github/workflows/security.yml` hace auditoría y pruebas de forma programada y ante cambios.
-- Los eventos de aplicación se registran como JSON sin contraseñas, tokens, emails ni cuerpos. Cada respuesta incluye `X-Request-Id` para correlación.
-- No se obtuvo salida de auditoría npm en el entorno de generación porque npm registry agotó el tiempo de espera; consulta `docs/SECURITY_PHASE4.md` y no interpretes esto como un resultado limpio.
+Para una versión de un solo proyecto Vercel (Express como Function + frontend Vite en `public/`), revisa [`docs/VERCEL.md`](docs/VERCEL.md). La raíz del proyecto debe ser `./`, y el build genera los assets estáticos. Vercel **no aloja MySQL ni n8n**: necesitas servicios externos HTTPS/TLS y configurar las variables de entorno en el panel. No subas archivos `.env`.
+
+## Carpetas principales
+
+```text
+backend/src/routes/          # rutas REST
+backend/src/controllers/     # entrada HTTP/respuestas
+backend/src/services/        # lógica de negocio/SQL parametrizado
+backend/src/middleware/      # sesiones, roles, CSRF, validación, logs
+backend/src/db.js            # pool mysql2/promise
+frontend/src/pages/           # pantallas React
+frontend/src/components/      # componentes compartidos
+frontend/src/services/api.js  # única capa de solicitudes a API
+n8n/workflow_raiz_madera.json # agente de reposición
+schema.sql                    # esquema de desarrollo + seed
+schema.production.sql         # esquema inicial sin datos demo
+```
+
+## Licencia y datos
+
+Los datos de ejemplo son ficticios. Para ventas reales, define política de privacidad, acceso, retención, copias cifradas y procedimientos de respuesta a incidentes antes de lanzar públicamente.

@@ -11,9 +11,9 @@ export function errorHandler(error, req, res, _next) {
     return res.status(400).json({ error: 'El cuerpo JSON no es válido' });
   }
 
-  if (error.code === '23505') return res.status(409).json({ error: 'Ya existe un registro con esos datos únicos' });
-  if (error.code === '23503') return res.status(409).json({ error: 'No se puede completar la operación porque el registro está relacionado con otros datos' });
-  if (error.code === '23514' || error.code === '22P02' || error.code === '22003' || error.code === '22008' || error.code === '22007') {
+  if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Ya existe un registro con esos datos únicos' });
+  if (['ER_ROW_IS_REFERENCED_2', 'ER_NO_REFERENCED_ROW_2'].includes(error.code)) return res.status(409).json({ error: 'No se puede completar la operación porque el registro está relacionado con otros datos' });
+  if (['ER_CHECK_CONSTRAINT_VIOLATED', 'ER_TRUNCATED_WRONG_VALUE', 'ER_DATA_TOO_LONG', 'ER_WARN_DATA_OUT_OF_RANGE', 'ER_BAD_NULL_ERROR', 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD'].includes(error.code)) {
     return res.status(400).json({ error: 'Los datos no cumplen el formato o las restricciones permitidas' });
   }
 

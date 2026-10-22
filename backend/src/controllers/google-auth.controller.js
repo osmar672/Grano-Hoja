@@ -1,6 +1,7 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { logInfo, logWarn } from '../utils/logger.js';
+import { getPublicHttpsOrigin } from '../utils/deploymentOrigin.js';
 import {
   createGoogleAccount,
   getAccountByEmail,
@@ -10,7 +11,7 @@ import {
   toPublicUser,
 } from '../services/auth.service.js';
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL || getPublicHttpsOrigin() || 'http://localhost:5173';
 const STATE_TTL_MS = 10 * 60 * 1000;
 
 function hasGoogleConfig() {
@@ -134,6 +135,6 @@ export async function googleCallback(req, res) {
     return res.redirect(303, target.toString());
   } catch (error) {
     // No se exponen errores OAuth, códigos ni tokens al navegador.
-    return loginRedirect(res, error.code === '23505' ? 'account_exists' : 'oauth_failed', req);
+    return loginRedirect(res, error.code === 'ER_DUP_ENTRY' ? 'account_exists' : 'oauth_failed', req);
   }
 }

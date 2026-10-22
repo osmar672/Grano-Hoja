@@ -1,21 +1,13 @@
 # Workflow de reposición — Raíz & Madera
 
-Importa `workflow_raiz_madera.json` en n8n. El workflow usa Webhook autenticado, validación de entrada, AI Agent, herramientas HTTP de lectura y `Respond to Webhook` con contrato `{ ok, data, error }`. El agente recomienda reposición de plantas, muebles y decoración; no modifica inventario.
+El archivo `workflow_raiz_madera.json` debe importarse en tu propia instancia n8n. No contiene credenciales por seguridad.
 
-## Backend → Webhook n8n
+Sigue la guía paso a paso [`../docs/MYSQL_N8N_SETUP.md`](../docs/MYSQL_N8N_SETUP.md) para iniciar MySQL 8.4 y n8n con Docker Desktop, arrancar Express/React, crear las dos credenciales Header Auth, seleccionar la credencial OpenAI Chat Model, activar el Webhook y probar la respuesta desde el frontend.
 
-1. Genera un secreto con `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`.
-2. Guárdalo solo en `backend/.env` como `N8N_WEBHOOK_AUTH_TOKEN` y define `N8N_WEBHOOK_URL` con la Production URL del webhook activado.
-3. En n8n crea una credencial **Header Auth** con header `x-rm-webhook-token` y el mismo secreto.
-4. Selecciona la credencial en la autenticación del nodo Webhook. No exportes credenciales dentro del JSON ni copies el token al frontend.
-5. La interfaz llama a `POST /api/agente/sugerencia-compra`; Express comprueba la sesión y rol `admin`/`encargado` antes de llamar a n8n.
+## Arquitectura
 
-## n8n → API (solo lectura)
+`React → POST /api/agente/sugerencia-compra → Express (sesión + rol) → Webhook n8n → HTTP Request Tools → GET /api/reportes/... → MySQL`.
 
-1. Genera un segundo token distinto con el comando anterior.
-2. Guárdalo en `backend/.env` como `N8N_API_SERVICE_TOKEN` y reinicia Express.
-3. Crea una credencial **HTTP Header Auth** con header `x-service-token` y ese valor.
-4. Selecciona esa credencial en los nodos **Productos bajo mínimo** y **Ventas últimos 7 días**.
-5. Ajusta los URLs según red: Docker Desktop suele usar `http://host.docker.internal:3001/api`; n8n local puede usar `http://localhost:3001/api`. Para n8n Cloud configura una URL HTTPS pública.
+No se conecta n8n directamente a MySQL: las herramientas acceden a reportes de solo lectura de Express con `N8N_API_SERVICE_TOKEN`. El webhook requiere un token diferente (`N8N_WEBHOOK_AUTH_TOKEN`). La respuesta de salida es `{ ok, data, error }`.
 
-El token de servicio solo da acceso a los endpoints GET de reportes definidos; no permite crear ni modificar productos, ventas o existencias. Mantén las credenciales fuera del export JSON.
+En Windows con Docker Desktop, los nodos de herramienta usan `http://host.docker.internal:3001/api/reportes/...`. En producción deben configurarse los endpoints HTTPS del dominio desplegado en ambos nodos y `N8N_WEBHOOK_URL` en `backend/.env`/secrets de despliegue.

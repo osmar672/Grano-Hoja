@@ -13,7 +13,7 @@
 - `CHECK (total = subtotal + impuesto)`: conserva coherencia aritmética entre total e importes.
 - `pedido_items.cantidad > 0`: una línea de venta siempre contiene una cantidad positiva.
 - `pedido_items.precio_unitario > 0`: conserva el precio no negativo histórico por unidad.
-- `NUMERIC(12,2)` para dinero: mantiene dos decimales sin aritmética monetaria binaria en PostgreSQL.
+- `DECIMAL(12,2)` para dinero: mantiene dos decimales sin aritmética monetaria binaria en MySQL 8.4.
 - `INTEGER` para stock: plantas en maceta, muebles y piezas de decoración se cuentan por unidad vendible en este modelo.
 
 Los índices soportan filtros por nombre/categoría/activo, alertas de stock y agregaciones de ventas por fecha/estado/método. Para vender productos por peso/volumen habría que ampliar el modelo de unidades y precisión antes de cargar esos artículos.

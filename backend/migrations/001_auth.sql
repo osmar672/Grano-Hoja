@@ -1,25 +1,25 @@
--- Migración idempotente para instalaciones donde schema.sql ya se cargó.
--- Ejecuta esta migración con el usuario dueño del esquema de la base de datos.
+-- MySQL 8.4: autenticación local. Ejecuta solo en una base MySQL que no tenga estas tablas.
 CREATE TABLE IF NOT EXISTS app_users (
-  id SERIAL PRIMARY KEY,
-  email VARCHAR(254) NOT NULL UNIQUE CHECK (email = LOWER(TRIM(email))),
-  display_name VARCHAR(120) NOT NULL CHECK (LENGTH(TRIM(display_name)) > 0),
-  password_hash TEXT NOT NULL CHECK (LENGTH(TRIM(password_hash)) > 0),
-  role VARCHAR(20) NOT NULL CHECK (role IN ('admin','encargado','caja')),
-  active BOOLEAN NOT NULL DEFAULT TRUE,
-  failed_login_attempts INTEGER NOT NULL DEFAULT 0 CHECK (failed_login_attempts >= 0),
-  locked_until TIMESTAMPTZ,
-  last_login_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS app_users_role_active_idx ON app_users(role, active);
-
-
--- Sesiones server-side para express-session / connect-pg-simple.
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(254) NOT NULL UNIQUE,
+  display_name VARCHAR(120) NOT NULL,
+  password_hash VARCHAR(255) NULL,
+  role VARCHAR(20) NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  failed_login_attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  locked_until DATETIME(3) NULL,
+  last_login_at DATETIME(3) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CONSTRAINT app_users_email_normalized CHECK (email=LOWER(TRIM(email))),
+  CONSTRAINT app_users_name_nonempty CHECK (CHAR_LENGTH(TRIM(display_name))>0),
+  CONSTRAINT app_users_role_allowed CHECK (role IN ('admin','encargado','caja')),
+  KEY app_users_role_active_idx (role,active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- El store de sesiones tiene createDatabaseTable=false; esta tabla debe existir antes del primer login.
 CREATE TABLE IF NOT EXISTS user_sessions (
-  sid VARCHAR NOT NULL PRIMARY KEY,
-  sess JSON NOT NULL,
-  expire TIMESTAMP(6) NOT NULL
-);
-CREATE INDEX IF NOT EXISTS user_sessions_expire_idx ON user_sessions(expire);
+  session_id VARCHAR(128) NOT NULL PRIMARY KEY,
+  expires INT UNSIGNED NOT NULL,
+  data MEDIUMTEXT NULL,
+  KEY user_sessions_expire_idx (expires)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

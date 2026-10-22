@@ -4,7 +4,7 @@ Este documento describe la configuración de seguridad para la versión de desar
 
 ## Implementado
 
-- Sesión del servidor con `express-session` y almacenamiento PostgreSQL mediante `connect-pg-simple`.
+- Sesión del servidor con `express-session` y almacenamiento MySQL mediante `express-mysql-session`.
 - Cookie `rm.sid` con `HttpOnly`, `SameSite=Lax` (para permitir el callback GET de Google OAuth) y `Secure` cuando `NODE_ENV=production`.
 - `SESSION_SECRET` obligatorio y de al menos 32 bytes; sesión expira en 30 minutos por defecto y se renueva con actividad.
 - Contraseñas guardadas como hashes bcrypt; el script seed no registra contraseñas.
@@ -15,7 +15,7 @@ Este documento describe la configuración de seguridad para la versión de desar
 - CSRF con token sincronizador aleatorio guardado en sesión para POST/PUT/PATCH/DELETE, validación de Origin y Fetch Metadata; el cliente React obtiene el token y lo manda en `X-CSRF-Token`.
 - Middleware de sesión y permisos por rol en endpoints protegidos.
 - Validación Zod en IDs, query params y cuerpos con esquemas estrictos.
-- Consultas PostgreSQL parametrizadas; ordenamiento dinámico mediante listas permitidas.
+- Consultas MySQL parametrizadas; ordenamiento dinámico mediante listas permitidas.
 - Límites de JSON, mensajes de error controlados y tokens n8n exclusivos de servidor.
 - `.env` y dependencias excluidos de Git.
 
@@ -41,9 +41,9 @@ Revisa `.env.example`, `backend/.env.example` y `frontend/.env.example`. En part
 
 - Fase 3: el backend tiene Helmet, CSRF y redirect HTTPS configurados. Sigue pendiente configurar certificados TLS, `PUBLIC_HTTPS_ORIGIN`, `TRUST_PROXY` y el origen de API en los encabezados del hosting real. `style-src 'unsafe-inline'` se mantiene por compatibilidad y debe evaluarse para endurecer CSP.
 - Fase 4: logger JSON con lista permitida, correlación por `X-Request-Id`, eventos de autenticación y cambios sensibles, pruebas que comprueban omisión de secretos, Dependabot y workflow CI de auditoría. **Pendiente de ejecución local:** `npm audit` real y lockfiles; el registro npm no respondió en el entorno de generación, por lo que no se afirma ausencia de vulnerabilidades. Configurar retención y alertas en el hosting.
-- Fase 5: pruebas de integración reales con PostgreSQL, OWASP ZAP, comprobación de cabeceras, prueba de bloqueo de login y revisión manual de permisos.
-- Crear usuario PostgreSQL dedicado con privilegios mínimos; no operar la API con el superusuario `postgres` en producción.
-- No exponer el puerto PostgreSQL en interfaces públicas; limitar firewall a los puertos necesarios. En `compose.yaml`, el puerto 5432 está publicado para desarrollo local; elimínalo o enlázalo a `127.0.0.1` en producción.
+- Fase 5: pruebas de integración reales con MySQL, OWASP ZAP, comprobación de cabeceras, prueba de bloqueo de login y revisión manual de permisos.
+- Crear usuario MySQL dedicado con privilegios mínimos; no operar la API con el superusuario `root` en producción.
+- No exponer el puerto MySQL en interfaces públicas; limitar firewall a los puertos necesarios. En `compose.yaml`, el puerto 3306 está publicado para desarrollo local; elimínalo o enlázalo a `127.0.0.1` en producción.
 - Configurar copias de seguridad cifradas, retención y prueba de restauración.
 - Revisar minimización de datos, aviso de privacidad y consentimiento acorde a la Ley 8968 de Costa Rica antes de guardar información de clientes.
 - Valorar segundo factor para cuentas administrativas.
@@ -82,7 +82,7 @@ No pegues contraseñas reales en tickets o bitácoras. Escanea el entorno de pru
 - `CORS_ORIGIN` debe contener solo el origen exacto del frontend, separado por comas si hay más de uno; `*` no está permitido.
 - En producción define `NODE_ENV=production` y `PUBLIC_HTTPS_ORIGIN=https://tu-dominio-real.example`. La app redirige peticiones HTTP a ese origen configurado; usa certificado TLS válido en el hosting o proxy.
 - Si TLS termina en un proxy inverso, configura `TRUST_PROXY=true` únicamente si Express recibe exactamente un proxy confiable. No confíes en cabeceras forwarded desde clientes públicos.
-- Para Netlify: el archivo `frontend/public/_headers` es una plantilla activa; sustituye `https://API_ORIGIN_REEMPLAZAR` por el origen HTTPS exacto de tu API antes de publicar. Para Vercel, haz la misma sustitución en `frontend/vercel.json`.
+- El despliegue validado está diseñado para un solo origen HTTPS con Caddy + Nginx (`compose.production.yaml`). No uses las viejas plantillas Netlify/Vercel; fueron retiradas porque el placeholder CSP podía bloquear la conexión y porque un despliegue separado requiere revisar cookies, CORS y CSRF.
 - La API no puede configurar HTTPS por un hosting externo: esa parte se debe completar en el proveedor o proxy del despliegue.
 
 ## Google OAuth / creación de cuentas
@@ -116,3 +116,14 @@ Consulta `docs/SECURITY_PHASE4.md` para instrucciones reproducibles. La auditor�
 | Alertas y retención en producción | Pendiente | Configúralas en el hosting/gestor de logs |
 
 En GitHub, después de hacer `git push`, revisa Settings → Advanced Security y activa **Dependabot alerts** y **Dependabot security updates** si están disponibles en el repositorio. La revisión semanal crea pull requests; no acepta automáticamente cambios de versión por ti.
+
+
+## Despliegue endurecido
+
+El perfil recomendado está documentado en [`docs/PRODUCCION.md`](docs/PRODUCCION.md) y usa `compose.production.yaml`, Caddy como terminación TLS, Nginx unprivileged, una base de datos sin puertos publicados y una cuenta MySQL dedicada a la aplicación. La configuración inicial requiere que el operador aporte dominio y secretos reales.
+
+La cuenta de aplicación no es propietaria de las tablas; el script de inicialización configura privilegios por defecto para las tablas y secuencias creadas durante la instalación nueva. No reutilices el superusuario MySQL como usuario de la aplicación; utiliza `DB_USER` y `DB_PASSWORD` con permisos mínimos.
+
+`/api/health` comprueba liveness; `/api/ready` comprueba conectividad con MySQL. El smoke test externo está en `scripts/production-smoke.mjs`. Ninguno sustituye un test integral, un escaneo OWASP ZAP, ni una restauración real de backups.
+
+**Pendiente antes de ponerlo ante clientes:** ejecutar `npm install`/`npm audit` y tests/build con acceso a npm; versionar `package-lock.json` de ambos paquetes tras validar; probar login local y Google OAuth sobre HTTPS; probar todas las reglas de venta contra MySQL 8.4; probar n8n real; escanear OWASP ZAP; configurar alertas/retención de logs; y probar restauración de un backup cifrado. No afirmar producción completada hasta que estas pruebas reales pasen.

@@ -2,6 +2,8 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.production.example
+!.env.vercel.example
 coverage/
 dist/
 .vite/
@@ -9,8 +11,15 @@ dist/
 Thumbs.db
 *.log
 backend/.data/
+backups/
 
 # Cookies y sesiones de pruebas: nunca versionarlas.
 cookies.txt
 *.cookies
 *.session
+
+# Producción: incluye contraseñas, sesiones, OAuth y tokens de servicio.
+.env.production
+
+# Built static assets copied for Vercel deployment. Generated during vercel-build.
+/public/

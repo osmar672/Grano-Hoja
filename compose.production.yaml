@@ -1,0 +1,142 @@
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    command: ["--default-time-zone=+00:00"]
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?Define MYSQL_DATABASE in .env.production}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD in .env.production}
+      MYSQL_APP_USER: ${APP_DB_USER:?Define APP_DB_USER in .env.production}
+      MYSQL_APP_PASSWORD: ${APP_DB_PASSWORD:?Define APP_DB_PASSWORD in .env.production}
+      TZ: UTC
+    volumes:
+      - raiz_madera_mysql_prod_data:/var/lib/mysql
+      - ./deploy/mysql/00-create-app-user.sh:/docker-entrypoint-initdb.d/00-create-app-user.sh:ro
+      - ./schema.production.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [data_net]
+    security_opt: ["no-new-privileges:true"]
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_USER: ${APP_DB_USER:?Define APP_DB_USER in .env.production}
+      DB_PASSWORD: ${APP_DB_PASSWORD:?Define APP_DB_PASSWORD in .env.production}
+      DB_NAME: ${MYSQL_DATABASE:?Define MYSQL_DATABASE in .env.production}
+      DB_SSL: "false"
+      DB_POOL_MAX: ${DB_POOL_MAX:-12}
+      CORS_ORIGIN: https://${PUBLIC_DOMAIN:?Define PUBLIC_DOMAIN in .env.production}
+      PUBLIC_HTTPS_ORIGIN: https://${PUBLIC_DOMAIN}
+      FRONTEND_URL: https://${PUBLIC_DOMAIN}
+      SESSION_SECRET: ${SESSION_SECRET:?Generate SESSION_SECRET}
+      SESSION_COOKIE_NAME: rm.sid
+      SESSION_MINUTES: ${SESSION_MINUTES:-30}
+      TRUST_PROXY_HOPS: "2"
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Configure OAuth Client ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Configure OAuth Client Secret}
+      GOOGLE_REDIRECT_URI: https://${PUBLIC_DOMAIN}/api/auth/google/callback
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:?Configure N8N_WEBHOOK_URL}
+      N8N_WEBHOOK_AUTH_TOKEN: ${N8N_WEBHOOK_AUTH_TOKEN:?Configure N8N_WEBHOOK_AUTH_TOKEN}
+      N8N_API_SERVICE_TOKEN: ${N8N_API_SERVICE_TOKEN:?Configure N8N_API_SERVICE_TOKEN}
+      LOGIN_IP_LIMIT: ${LOGIN_IP_LIMIT:-10}
+      TZ: America/Costa_Rica
+    depends_on:
+      db:
+        condition: service_healthy
+    expose: ["3001"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/ready', { headers: { 'x-forwarded-proto': 'https' } }).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    networks: [web_api_net, data_net]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,noexec,nosuid,nodev"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    init: true
+
+  seed:
+    build: ./backend
+    profiles: ["bootstrap"]
+    restart: "no"
+    entrypoint: ["npm", "run", "users:seed"]
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_USER: ${APP_DB_USER:?Define APP_DB_USER}
+      DB_PASSWORD: ${APP_DB_PASSWORD:?Define APP_DB_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE:?Define MYSQL_DATABASE}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:?Define SEED_ADMIN_EMAIL}
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:?Define SEED_ADMIN_NAME}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Define SEED_ADMIN_PASSWORD}
+      SEED_MANAGER_EMAIL: ${SEED_MANAGER_EMAIL:?Define SEED_MANAGER_EMAIL}
+      SEED_MANAGER_NAME: ${SEED_MANAGER_NAME:?Define SEED_MANAGER_NAME}
+      SEED_MANAGER_PASSWORD: ${SEED_MANAGER_PASSWORD:?Define SEED_MANAGER_PASSWORD}
+      SEED_CASHIER_EMAIL: ${SEED_CASHIER_EMAIL:?Define SEED_CASHIER_EMAIL}
+      SEED_CASHIER_NAME: ${SEED_CASHIER_NAME:?Define SEED_CASHIER_NAME}
+      SEED_CASHIER_PASSWORD: ${SEED_CASHIER_PASSWORD:?Define SEED_CASHIER_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [data_net]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,noexec,nosuid,nodev"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    expose: ["8080"]
+    networks: [edge_net, web_api_net]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,noexec,nosuid,nodev"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?Define PUBLIC_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_started
+    networks: [edge_net]
+    security_opt: ["no-new-privileges:true"]
+
+networks:
+  edge_net:
+  web_api_net:
+  data_net:
+
+volumes:
+  raiz_madera_mysql_prod_data:
+  caddy_data:
+  caddy_config:

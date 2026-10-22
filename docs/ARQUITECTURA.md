@@ -22,7 +22,7 @@ erDiagram
 - `routes/`: define HTTP methods, sesión, rol y esquema Zod.
 - `controllers/`: conecta entrada/salida HTTP con los servicios.
 - `services/`: validaciones de negocio, consultas parametrizadas y transacciones.
-- `db.js`: conexión PostgreSQL usando Pool.
+- `db.js`: pool mysql2/promise.
 - `middleware/`: autentica, autoriza, valida entrada y normaliza errores.
 
 ## Reglas de stock
@@ -35,7 +35,7 @@ erDiagram
 
 ## Seguridad
 
-La autenticación se basa en cookies de sesión server-side almacenadas en PostgreSQL. El backend vuelve a consultar la cuenta y aplica la matriz de permisos. No se confía en las rutas ocultas del frontend. Los secretos de sesión y del workflow n8n quedan en variables de entorno; las consultas SQL son parametrizadas y el `ORDER BY` dinámico usa una lista blanca.
+La autenticación se basa en cookies de sesión server-side almacenadas en MySQL 8.4. El backend vuelve a consultar la cuenta y aplica la matriz de permisos. No se confía en las rutas ocultas del frontend. Los secretos de sesión y del workflow n8n quedan en variables de entorno; las consultas SQL son parametrizadas y el `ORDER BY` dinámico usa una lista blanca.
 
 ## Agente de reposición
 

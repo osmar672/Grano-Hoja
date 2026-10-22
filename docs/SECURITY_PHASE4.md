@@ -57,7 +57,7 @@ Haz esto por separado en `backend` y `frontend`, vuelve a ejecutar sus pruebas y
 - En desarrollo, los logs estructurados salen por stdout/stderr para mostrarse en terminal.
 - En producción, el gestor de procesos, contenedor o plataforma debe recoger stdout/stderr, limitar acceso y definir retención. No se guardan en archivos locales por defecto.
 - Alertar ante: oleadas de `auth.login_rejected`, múltiples `authz.access_denied`, errores HTTP 5xx sostenidos, `database.pool_error` repetidos y fallos continuos del asistente. Usa `X-Request-Id` para correlacionar una respuesta con un log.
-- No registrar cuerpos de peticiones, cookies, encabezados de autorización, tokens CSRF, credenciales Google, `DATABASE_URL`, correos o contenido del prompt del agente.
+- No registrar cuerpos de peticiones, cookies, encabezados de autorización, tokens CSRF, credenciales Google, `DB_PASSWORD`, `DB_HOST` o detalles de conexión MySQL, correos o contenido del prompt del agente.
 
 ## Pendientes
 
