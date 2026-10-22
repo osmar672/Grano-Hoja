@@ -150,3 +150,7 @@ schema.production.sql         # esquema inicial sin datos demo
 ## Licencia y datos
 
 Los datos de ejemplo son ficticios. Para ventas reales, define política de privacidad, acceso, retención, copias cifradas y procedimientos de respuesta a incidentes antes de lanzar públicamente.
+
+## Publicación en Vercel
+
+Usa el archivo **`PUBLICAR_EN_VERCEL.md`**. Este proyecto se importa desde el directorio raíz como una sola aplicación: React se compila y se empaqueta junto con la API Express. No importes únicamente `frontend/` ni `backend/`. MySQL y n8n deben estar alojados externamente y configurados mediante variables de entorno de Vercel.
